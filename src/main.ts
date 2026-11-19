@@ -1,6 +1,7 @@
 import './styles.css';
 import { buildQuery, buildVocabulary, type VocabEntry } from './lib/query';
 import { isHttpUrl, parseFile, type Item } from './lib/parse';
+import { loadItems, saveItems } from './lib/storage';
 
 const app = document.querySelector<HTMLDivElement>('#app');
 if (!app) throw new Error('#app not found');
@@ -234,13 +235,31 @@ function renderRecent(): void {
 
 // ---------- 导入 ----------
 
+/** 采纳一组条目：重建词库、刷新计数与结果。 */
+function applyItems(source: Item[]): void {
+  items = source;
+  vocab = buildVocabulary(items);
+  countEl.textContent = `${items.length} 条目`;
+  renderFiltered();
+}
+
 function loadFile(file: File): void {
   void file.text().then((text) => {
-    items = parseFile(text);
-    vocab = buildVocabulary(items);
-    countEl.textContent = `${items.length} 条目`;
-    renderFiltered();
+    applyItems(parseFile(text));
+    void saveItems(items).catch((err) => console.warn('保存到本地失败', err));
   });
+}
+
+/** 启动：若本地已有条目则直接展示（文件之外的第二副本，文件仍为真源）。 */
+async function init(): Promise<void> {
+  try {
+    const stored = await loadItems();
+    // 仅当用户尚未导入过时采纳缓存，避免与极快的重导入竞态覆盖内存数据
+    if (stored && stored.length > 0 && items.length === 0) applyItems(stored);
+  } catch (err) {
+    console.warn('读取本地数据失败，退回到内存模式', err);
+  }
+  renderFiltered();
 }
 
 // ---------- 事件 ----------
@@ -260,4 +279,4 @@ for (const btn of app.querySelectorAll<HTMLButtonElement>('.op[data-op]')) {
 app.querySelector<HTMLButtonElement>('#btn-exclude')!.addEventListener('click', toggleExclude);
 app.querySelector<HTMLButtonElement>('#btn-kline')!.addEventListener('click', keywordLineOnly);
 
-renderFiltered();
+void init();

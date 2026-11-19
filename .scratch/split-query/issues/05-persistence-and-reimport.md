@@ -4,8 +4,8 @@
 
 **Blocked by:** 01
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] IndexedDB 保存与读取（单集合）
-- [ ] 启动时已有数据则直接展示
-- [ ] 重导入整体替换 + 条目数提示
+- [x] IndexedDB 保存与读取（单集合）
+- [x] 启动时已有数据则直接展示（含与快速重导入的竞态守卫）
+- [x] 重导入整体替换 + 条目数提示
