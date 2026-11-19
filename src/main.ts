@@ -280,3 +280,21 @@ app.querySelector<HTMLButtonElement>('#btn-exclude')!.addEventListener('click', 
 app.querySelector<HTMLButtonElement>('#btn-kline')!.addEventListener('click', keywordLineOnly);
 
 void init();
+
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  window.addEventListener('load', () => {
+    void navigator.serviceWorker
+      .register('./sw.js')
+      .then(() => navigator.serviceWorker.ready)
+      .then((reg) => {
+        // 预热：首屏资源在 SW 接管前已加载，把同源资源 URL 交给 SW 缓存，一次在线即可离线
+        const urls = performance
+          .getEntriesByType('resource')
+          .map((entry) => entry.name)
+          .filter((url) => url.startsWith(window.location.origin));
+        urls.push(window.location.href);
+        reg.active?.postMessage({ type: 'warmup', urls });
+      })
+      .catch((err) => console.warn('Service Worker 注册失败', err));
+  });
+}

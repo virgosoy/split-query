@@ -4,9 +4,9 @@
 
 **Blocked by:** 01
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] manifest + 图标
-- [ ] service worker cache-first 缓存 app shell
-- [ ] iOS standalone meta
-- [ ] 离线（飞行模式）刷新页面可用
+- [x] manifest + 图标（180/192/512）
+- [x] service worker：安装预缓存 shell；导航网络优先；静态资源缓存优先；首屏资源预热（一次在线即离线）
+- [x] iOS standalone meta（apple-touch-icon、apple-mobile-web-app-*、mobile-web-app-capable）
+- [ ] 离线（飞行模式）刷新页面可用 —— 需真机/浏览器人工验证
