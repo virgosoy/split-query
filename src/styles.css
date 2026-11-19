@@ -69,6 +69,24 @@ body {
   font-size: 13px;
 }
 
+.search {
+  width: 100%;
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--surface-2);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 14px;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 48px;
+}
+
+.search::placeholder {
+  color: var(--muted);
+}
+
 .results {
   display: flex;
   flex-direction: column;

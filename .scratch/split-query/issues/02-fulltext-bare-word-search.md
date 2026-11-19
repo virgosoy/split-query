@@ -4,9 +4,9 @@
 
 **Blocked by:** 01
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] query seam：裸词谓词按行解析（行内 AND、行间 OR）
-- [ ] 子串包含匹配；拉丁词大小写不敏感
-- [ ] 空查询＝显示全部、顺序不变
-- [ ] query 参数化矩阵：AND / OR / 大小写 / 空查询
+- [x] query seam：裸词谓词按行解析（行内 AND、行间 OR）
+- [x] 子串包含匹配；拉丁词大小写不敏感
+- [x] 空查询＝显示全部、顺序不变
+- [x] query 参数化矩阵（it.each 表驱动）：AND / OR / 大小写 / 空查询

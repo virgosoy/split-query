@@ -1,4 +1,5 @@
 import './styles.css';
+import { buildQuery } from './lib/query';
 import { isHttpUrl, parseFile, type Item } from './lib/parse';
 
 const app = document.querySelector<HTMLDivElement>('#app');
@@ -11,6 +12,8 @@ app.innerHTML = `
     <input id="file-input" type="file" accept=".txt,text/plain" hidden />
     <span id="count" class="count"></span>
   </header>
+  <textarea id="search" class="search" rows="2" inputmode="search"
+    placeholder="搜索：同行空格 AND · 换行 OR"></textarea>
   <main id="results" class="results"></main>
 `;
 
@@ -18,6 +21,7 @@ const fileInput = app.querySelector<HTMLInputElement>('#file-input')!;
 const importBtn = app.querySelector<HTMLButtonElement>('#import-btn')!;
 const countEl = app.querySelector<HTMLSpanElement>('#count')!;
 const results = app.querySelector<HTMLElement>('#results')!;
+const search = app.querySelector<HTMLTextAreaElement>('#search')!;
 
 let items: Item[] = [];
 
@@ -59,11 +63,15 @@ function render(list: Item[]): void {
   }
 }
 
+function renderFiltered(): void {
+  render(items.filter(buildQuery(search.value)));
+}
+
 function loadFile(file: File): void {
   void file.text().then((text) => {
     items = parseFile(text);
     countEl.textContent = `${items.length} 条目`;
-    render(items);
+    renderFiltered();
   });
 }
 
@@ -74,4 +82,6 @@ fileInput.addEventListener('change', () => {
   fileInput.value = '';
 });
 
-render(items);
+search.addEventListener('input', renderFiltered);
+
+renderFiltered();
