@@ -4,10 +4,10 @@
 
 **Blocked by:** None（可立即开始）
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Vite + TypeScript 工程，`npm run dev` 可本地起页
-- [ ] parse seam：按空行切分条目；每条目拆出关键词行（首行）、首词（第一个空格分隔词）、其他行；条目可只有 1 行
-- [ ] 导入示例数据后渲染为条目卡片，整条目完整显示
-- [ ] 条目内的 URL 行可点击，在系统浏览器打开
-- [ ] parse seam 单元测试：已知文本 → 精确条目结构
+- [x] Vite + TypeScript 工程，`npm run dev` 可本地起页
+- [x] parse seam：按空行切分条目；每条目拆出关键词行（首行）、首词（第一个空格分隔词）、其他行；条目可只有 1 行
+- [x] 导入示例数据后渲染为条目卡片，整条目完整显示
+- [x] 条目内的 URL 行可点击，在系统浏览器打开（http/https 均识别）
+- [x] parse seam 单元测试：已知文本 → 精确条目结构（5/5 通过）
