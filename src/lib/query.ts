@@ -1,5 +1,6 @@
 /**
- * query seam：搜索文本 → (条目)=>boolean（纯函数，v1 的完整检索边界）。
+ * query seam：搜索文本 → (条目)=>boolean 的谓词，以及补全词库
+ * （buildQuery / buildVocabulary，均纯函数，v1 的检索边界）。
  *
  * 语法（spec：.scratch/split-query/spec.md）：
  * - 同行空格分隔的条件 = AND；不同行 = OR。
@@ -97,4 +98,26 @@ export function buildQuery(queryText: string): (item: Item) => boolean {
   if (groups.length === 0) return () => true;
 
   return (item) => groups.some((terms) => terms.every((t) => termMatches(t, item)));
+}
+
+/** 词库条目：关键词行出现过的词及其出现次数。 */
+export interface VocabEntry {
+  word: string;
+  count: number;
+}
+
+/**
+ * 聚合全部条目「关键词行」出现过的词，按出现次数降序、同词频按首见顺序去重。
+ * 仅来自关键词行（其他行不参与）；用于搜索框自动补全的候选词库。
+ */
+export function buildVocabulary(items: Item[]): VocabEntry[] {
+  const counts = new Map<string, number>();
+  for (const item of items) {
+    for (const word of item.keywordLine.split(/\s+/)) {
+      counts.set(word, (counts.get(word) ?? 0) + 1);
+    }
+  }
+  return [...counts.entries()]
+    .map(([word, count]) => ({ word, count }))
+    .sort((a, b) => b.count - a.count);
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildQuery } from './query';
+import { buildQuery, buildVocabulary } from './query';
 import type { Item } from './parse';
 
 const items: Item[] = [
@@ -61,5 +61,29 @@ describe('buildQuery — 算子（k:/h:/锚点/大小写/全角冒号/!）', () 
 
   it.each(matrix)('%s：%j → %j', (_label, query, expected) => {
     expect(matchesLines(query)).toEqual(expected);
+  });
+});
+
+describe('buildVocabulary — 补全词库', () => {
+  it('聚合各条目关键词行的词，按出现次数降序，去重且其余行不参与', () => {
+    const vocab = buildVocabulary(items);
+    expect(vocab.map((v) => v.word)).toEqual([
+      '国内', // 出现 2 次（×2 条目关键词行）
+      'vue', 'router', '前端', '百度', '搜索', '混元', '新', '常用搜索', // 各 1 次，按首见顺序
+    ]);
+  });
+
+  it('同关键词行内重复的词按出现次数计数', () => {
+    const v = buildVocabulary([
+      { keywordLine: 'a a b', headKeyword: 'a', otherLines: ['a'] }, // 其他行不计
+    ]);
+    expect(v).toEqual([
+      { word: 'a', count: 2 },
+      { word: 'b', count: 1 },
+    ]);
+  });
+
+  it('空条目集返回空词库', () => {
+    expect(buildVocabulary([])).toEqual([]);
   });
 });
