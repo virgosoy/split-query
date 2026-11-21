@@ -24,12 +24,15 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # smoke 用全局 WebSocket 驱动 CDP，需要 Node 22+
+          node-version: 22
           cache: npm
 
       - run: npm ci
       - run: npm run check
-      - run: npm run build
+
+      # smoke 内含 build；离线承诺坏了就让部署失败——这是有意为之
+      - run: npm run smoke
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
