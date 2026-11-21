@@ -6,3 +6,13 @@
 ❯ 对了，我的iphone是14，ios 版本是 16.1.1 ，短期内不会更新，这个有影响吗？
 
 - [ ] feat: 显示此程序占用的资源空间
+  - 设计已定稿（2026-11-21 grilling）→ 票 `08`（面板）、`09`（空态首用提示）；决定记在 `.scratch/split-query/spec.md` 的「v1.1 追加」
+  - 原「主屏豁免提示」并入 09 的空态首用句：依据 WebKit 官方说明（主屏 web app 不属于 Safari、不受 7 天 script-writable storage 清理），**无条件陈述、不做检测**（不读 `navigator.standalone`；`(display-mode: standalone)` 在该场景下反而是坏的——BCD 标注 false/fullscreen、bug 264218，绝不使用）
+
+## 由「资源空间」这一轮引出的后续功能（v1 不做，2026-11-20 记录）
+
+- [ ] feat: 清除本地数据 / 缓存（文件是唯一真源，删掉后重新导入即可恢复）。待定：删哪个桶、删完界面状态怎么收回、要不要二次确认
+- [ ] feat: 导出 / 备份本地副本（把 IndexedDB 里的条目导回文本文件，与「文件是真源」互补）
+- [ ] feat: 面板里给「查看 / 清理系统站点数据」的引导。需要先核实 iOS 16.1 上真实可达的路径，不能凭空写文案
+- [ ] fix: 最近搜索只在内存里（`src/main.ts` 的 `recent` 数组未落盘），刷新即失 —— 不是本轮范围，读代码时发现的真实缺口
+- [ ] feat: 系统配额 / 已用（`navigator.storage.estimate()` 的 `usage` / `quota`）—— iOS 16.1 上此 API 不存在（落在 Safari 17 / iOS 17：MDN BCD `api/StorageManager.json` `version_added: "17"`，WebKit 的 Safari 17 beta 公告列为 "newly supported"）。将来升到 iOS 17 后可直接读出「已用 / 上限」，届时给面板加一行；v1 不写这段探测分支（在目标设备上永远不渲染 = 无法人工验证 = 负债）
