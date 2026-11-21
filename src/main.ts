@@ -2,6 +2,7 @@ import './styles.css';
 import { buildQuery, buildVocabulary, type VocabEntry } from './lib/query';
 import { isHttpUrl, parseFile, type Item } from './lib/parse';
 import { loadItems, saveItems } from './lib/storage';
+import { formatBytes } from './lib/format';
 
 const app = document.querySelector<HTMLDivElement>('#app');
 if (!app) throw new Error('#app not found');
@@ -11,6 +12,7 @@ app.innerHTML = `
     <h1 class="brand">split-query</h1>
     <button id="import-btn" class="btn" type="button">导入文件</button>
     <input id="file-input" type="file" accept=".txt,text/plain" hidden />
+    <button id="usage-btn" class="btn" type="button">存储</button>
     <span id="count" class="count"></span>
   </header>
   <textarea id="search" class="search" rows="2" inputmode="search" autocomplete="off"
@@ -27,6 +29,18 @@ app.innerHTML = `
   </div>
   <div id="recent" class="recent" hidden></div>
   <main id="results" class="results"></main>
+  <div id="usage" class="usage" hidden>
+    <div class="usage-panel" role="dialog" aria-modal="true" aria-labelledby="usage-title">
+      <h2 id="usage-title" class="usage-title">资源空间</h2>
+      <dl class="usage-list">
+        <div class="usage-row"><dt>条目数据</dt><dd id="usage-items"></dd></div>
+        <div class="usage-row"><dt>应用资源</dt><dd id="usage-app"></dd></div>
+        <div id="usage-total-row" class="usage-row usage-row-total" hidden><dt>合计</dt><dd id="usage-total"></dd></div>
+      </dl>
+      <p class="usage-note">只统计本站点脚本可写的存储，不含浏览器 HTTP 缓存与系统快照，因此不等于手机剩余空间的变化量。文件是唯一真源：重新导入整体替换、不累积。</p>
+      <button id="usage-close" class="btn" type="button">关闭</button>
+    </div>
+  </div>
 `;
 
 const fileInput = app.querySelector<HTMLInputElement>('#file-input')!;
@@ -36,6 +50,12 @@ const results = app.querySelector<HTMLElement>('#results')!;
 const search = app.querySelector<HTMLTextAreaElement>('#search')!;
 const suggest = app.querySelector<HTMLDivElement>('#suggest')!;
 const recentEl = app.querySelector<HTMLDivElement>('#recent')!;
+const usageBtn = app.querySelector<HTMLButtonElement>('#usage-btn')!;
+const usageEl = app.querySelector<HTMLDivElement>('#usage')!;
+const usageItemsEl = app.querySelector<HTMLElement>('#usage-items')!;
+const usageAppEl = app.querySelector<HTMLElement>('#usage-app')!;
+const usageTotalRow = app.querySelector<HTMLElement>('#usage-total-row')!;
+const usageTotalEl = app.querySelector<HTMLElement>('#usage-total')!;
 
 let items: Item[] = [];
 let vocab: VocabEntry[] = [];
@@ -262,6 +282,81 @@ async function init(): Promise<void> {
   renderFiltered();
 }
 
+// ---------- 资源空间 ----------
+
+/** 一次测量的结果：读到字节 / 从未导入 / 读失败。 */
+type Measurement = { kind: 'bytes'; value: number } | { kind: 'empty' } | { kind: 'error' };
+
+/** 字符串的 UTF-8 净字节。 */
+function utf8Bytes(text: string): number {
+  return new TextEncoder().encode(text).length;
+}
+
+/**
+ * 条目数据＝条目的本地副本：按 UTF-8 内容净字节求和，不含 JSON 结构开销，
+ * 因此可与用户的文件大小直接对照。打开面板时现读，不用导入时的快照。
+ */
+async function measureItemData(): Promise<Measurement> {
+  try {
+    const stored = await loadItems();
+    if (stored === null) return { kind: 'empty' }; // 从未导入过，与"导入过但一个条目都没有"不同
+    let total = 0;
+    for (const item of stored) {
+      total += utf8Bytes(item.keywordLine);
+      for (const line of item.otherLines) total += utf8Bytes(line);
+    }
+    return { kind: 'bytes', value: total };
+  } catch (err) {
+    console.warn('读取条目数据大小失败', err);
+    return { kind: 'error' };
+  }
+}
+
+/** 应用资源＝离线所需的全部缓存内容。遍历所有 cache，不硬编码缓存名（那份常量在 sw.js 里）。 */
+async function measureAppResources(): Promise<Measurement> {
+  if (typeof caches === 'undefined') return { kind: 'error' };
+  try {
+    let total = 0;
+    for (const name of await caches.keys()) {
+      const cache = await caches.open(name);
+      for (const request of await cache.keys()) {
+        const response = await cache.match(request);
+        if (response) total += (await response.blob()).size;
+      }
+    }
+    return { kind: 'bytes', value: total };
+  } catch (err) {
+    console.warn('读取应用资源大小失败', err);
+    return { kind: 'error' };
+  }
+}
+
+function measurementLabel(measurement: Measurement): string {
+  if (measurement.kind === 'empty') return '尚未导入';
+  if (measurement.kind === 'error') return '不可用';
+  return formatBytes(measurement.value);
+}
+
+function openUsage(): void {
+  usageEl.hidden = false;
+  usageItemsEl.textContent = '读取中…';
+  usageAppEl.textContent = '读取中…';
+  usageTotalRow.hidden = true;
+  void Promise.all([measureItemData(), measureAppResources()]).then(([data, resources]) => {
+    usageItemsEl.textContent = measurementLabel(data);
+    usageAppEl.textContent = measurementLabel(resources);
+    // 合计是两个实测值之和；缺任一项时它就不是求和而是编造，故整行不显示
+    if (data.kind === 'bytes' && resources.kind === 'bytes') {
+      usageTotalEl.textContent = formatBytes(data.value + resources.value);
+      usageTotalRow.hidden = false;
+    }
+  });
+}
+
+function closeUsage(): void {
+  usageEl.hidden = true;
+}
+
 // ---------- 事件 ----------
 
 importBtn.addEventListener('click', () => fileInput.click());
@@ -278,6 +373,12 @@ for (const btn of app.querySelectorAll<HTMLButtonElement>('.op[data-op]')) {
 }
 app.querySelector<HTMLButtonElement>('#btn-exclude')!.addEventListener('click', toggleExclude);
 app.querySelector<HTMLButtonElement>('#btn-kline')!.addEventListener('click', keywordLineOnly);
+
+usageBtn.addEventListener('click', openUsage);
+app.querySelector<HTMLButtonElement>('#usage-close')!.addEventListener('click', closeUsage);
+usageEl.addEventListener('click', (event) => {
+  if (event.target === usageEl) closeUsage(); // 点遮罩关闭；点面板内部不关
+});
 
 void init();
 
