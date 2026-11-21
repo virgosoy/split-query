@@ -78,7 +78,9 @@ body {
   border-radius: var(--radius);
   background: var(--surface);
   color: var(--text);
-  font-size: 14px;
+  /* 16px 是 iOS Safari 聚焦输入框不自动放大的硬阈值（15.99px 也会触发）；
+     调小会让点搜索框时整页放大、横向滑动，妨碍查看结果。不得下调。 */
+  font-size: 16px;
   font-family: inherit;
   resize: vertical;
   min-height: 48px;

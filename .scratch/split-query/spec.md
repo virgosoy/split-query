@@ -98,3 +98,9 @@
 - **不用 `navigator.storage.estimate()` 读「已用 / 配额」**：该 API 落在 Safari 17 / iOS 17，目标设备 iOS 16.1 上**不存在**（同一版本的 `StorageEstimate.usageDetails`、`storageBuckets` 在 Safari 里从未有过）。目标设备短期内不升级，写探测分支等于一段永远不渲染、因而无法人工验证的 UI。将来升级到 iOS 17 后可作为新票追加。
 - **不引入 `navigator.storage.persist()`**：该 API 在 iOS 16.1 上带 bug（WebKit 于 Safari 17 周期才修复），且主屏豁免已使 7 天清理不适用于本应用的主用法。
 - 不做清理 / 导出 / 系统设置引导（见 `draft.md` 的后续清单）。
+
+## v1.1 追加（2026-11-21）：搜索框字号契约
+
+### Implementation Decisions（追加）
+
+- **搜索输入框字号固定 `16px`**：iOS Safari 聚焦计算字号 `< 16px` 的 `input`/`textarea` 时会强制放大页面（15.99px 也触发）；放大后内容宽于视觉视口、可横向拖动，妨碍查看结果。因此 `.search` 的 `font-size: 16px` 是**构建契约，不得下调**。修复一律走字号，不用 `maximum-scale` / `user-scalable=no`（会禁掉用户双指缩放，且 iOS 10+ 对该类声明处理不稳定），不用 JS focus 补丁。
