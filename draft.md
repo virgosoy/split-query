@@ -16,3 +16,4 @@
 - [ ] feat: 面板里给「查看 / 清理系统站点数据」的引导。需要先核实 iOS 16.1 上真实可达的路径，不能凭空写文案
 - [ ] fix: 最近搜索只在内存里（`src/main.ts` 的 `recent` 数组未落盘），刷新即失 —— 不是本轮范围，读代码时发现的真实缺口
 - [ ] feat: 系统配额 / 已用（`navigator.storage.estimate()` 的 `usage` / `quota`）—— iOS 16.1 上此 API 不存在（落在 Safari 17 / iOS 17：MDN BCD `api/StorageManager.json` `version_added: "17"`，WebKit 的 Safari 17 beta 公告列为 "newly supported"）。将来升到 iOS 17 后可直接读出「已用 / 上限」，届时给面板加一行；v1 不写这段探测分支（在目标设备上永远不渲染 = 无法人工验证 = 负债）
+- [ ] fix: Service Worker 预热被 `/favicon.ico` 的 404 整批拖垮 —— 浏览器自动请求 `/favicon.ico`（应用没有 favicon）拿到 404，而预热用的 `cache.addAll()` 是**全有或全无**，一条失败即整批 reject，又被 `.catch(() => {})` 吞掉 → 预热一条都没写进缓存。后果：**「一次在线即离线」不成立**（首次在线访问后 JS/CSS 未入缓存，需第二次加载），且 `应用资源` 只统计到 shell 的 8754 B（真实 22446 B）。2026-11-21 票 08 验收时发现，证据见 `.scratch/split-query/issues/08-resource-usage-panel.md`。修法建议两者都做：预热改为逐条 `add` + `Promise.allSettled`（对运行时发现的 URL 必须容错）；并补一个 favicon 彻底消除 404
