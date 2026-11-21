@@ -6,8 +6,9 @@
  * cache.addAll 整批 reject，又被 catch 吞掉），直到票 08 验收才被发现。这个脚本
  * 补那条盲区，并且红在真缺陷上：
  *
- *   1. 全新 profile 在线打开一次 → 断言静态资源已进缓存（预热生效）
- *   2. 断网刷新 → 断言应用仍能渲染（证明离线可用）
+ *   1. 全新 profile 在线打开一次 → 断言 .js 与 .css 已进缓存（预热生效）
+ *   2. 同批预热里一个 URL 失败 → 断言好 URL 仍进缓存（逐条容错）
+ *   3. 断网刷新 → 断言应用仍能渲染（证明离线可用）
  *
  * 用法：
  *   npm run smoke                      # 构建 + 本地预览 + 检查
@@ -54,30 +55,64 @@ try {
   });
   if (!ready) fail('Service Worker 未在 20 秒内接管页面。');
 
-  // 2) 一次在线访问后，带哈希的静态资源应已进缓存（即预热生效）
-  const cachedAsset = await browser.waitFor(
+  // 2) 一次在线访问后，带哈希的静态资源应已进缓存（即预热生效）。
+  //    要求 .js 与 .css 同时存在：只看「任意 /assets/」会漏掉 CSS 单独失败的部分预热。
+  const cachedAssets = await browser.waitFor(
     `(async () => {
+      const paths = [];
       for (const name of await caches.keys()) {
         const cache = await caches.open(name);
-        for (const request of await cache.keys()) {
-          if (new URL(request.url).pathname.includes('/assets/')) return request.url;
-        }
+        for (const request of await cache.keys()) paths.push(new URL(request.url).pathname);
       }
-      return null;
+      const hasJs = paths.some((p) => p.includes('/assets/') && p.endsWith('.js'));
+      const hasCss = paths.some((p) => p.includes('/assets/') && p.endsWith('.css'));
+      return hasJs && hasCss ? paths : null;
     })()`,
     { awaitPromise: true, timeout: 15000 },
   );
-  if (!cachedAsset) {
+  if (!cachedAssets) {
     const inventory = await cacheInventory(browser);
     fail(
-      '预缓存里没有任何 /assets/ 静态资源——「一次在线即离线」不成立。\n' +
-        '  常见诱因：预热用 cache.addAll（全有或全无），某个 URL 失败（如 /favicon.ico 404）\n' +
-        '  就会让整批 reject，而错误又被 .catch 吞掉。\n' +
+      '预缓存里缺少完整的 /assets/ 资源（需要 .js 与 .css）——「一次在线即离线」不成立。\n' +
+        '  常见诱因：预热用 cache.addAll（全有或全无），一个 URL 失败就会让整批 reject。\n' +
+        '  失败可能是 404（如 /favicon.ico），也可能是重复 URL\n' +
+        '  （InvalidStateError: duplicate requests，例如 favicon 与 manifest 都指向 icon-192.png）。\n' +
         `  当前缓存：${inventory}`,
     );
   }
 
-  // 3) 断网刷新 → 应用仍应渲染（JS 从缓存取到并执行）
+  // 3) 逐条容错：同一批预热里一个 URL 失败，不能拖垮其余 URL。
+  //    这是票 10 的核心属性；不能只靠浏览器恰好请求了重复 URL 来间接覆盖。
+  const probeGood = await browser.evaluate(
+    `(async () => {
+      const good = new URL('icon-192.png?warmup-probe=' + Date.now(), location.href).href;
+      // 带 credentials 的同源 URL：通过 SW 的同源过滤，但 cache.add 会以 TypeError 拒绝。
+      const bad = location.protocol + '//user:pass@' + location.host + '/warmup-probe-missing.js';
+      const reg = await navigator.serviceWorker.ready;
+      reg.active.postMessage({ type: 'warmup', urls: [good, bad] });
+      return good;
+    })()`,
+    { awaitPromise: true },
+  );
+  if (!probeGood) fail('无法向 Service Worker 发送预热探测消息（reg.active 为空）。');
+  const probeCached = await browser.waitFor(
+    `(async () => {
+      for (const name of await caches.keys()) {
+        const cache = await caches.open(name);
+        if (await cache.match(${JSON.stringify(probeGood)})) return true;
+      }
+      return false;
+    })()`,
+    { awaitPromise: true, timeout: 10000 },
+  );
+  if (!probeCached) {
+    fail(
+      '逐条容错失效：同一批预热里有一个失败 URL 时，好 URL 也没进缓存。\n' +
+        '  预热必须逐条 cache.add 并各自 catch；cache.addAll 是全有或全无。',
+    );
+  }
+
+  // 4) 断网刷新 → 应用仍应渲染（JS 从缓存取到并执行）
   await browser.setOffline(true);
   await browser.reload();
   const rendered = await browser.waitFor(

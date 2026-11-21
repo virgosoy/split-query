@@ -52,3 +52,9 @@
 | 缓存总量（全新 profile，一次在线） | **22640 B**（shell + JS 10576 + CSS 3152） |
 | `资源空间` 面板 `应用资源` | **22.1 KB**（不再是 8754 B / 8.5 KB） |
 | 断网重开 | 应用正常渲染；IndexedDB 中的 2 条条目载入；搜索 `alpha` 得到 1 条结果 ✓ |
+
+## 补记（2026-11-21 retro）
+
+复核「修复前复跑 smoke」时发现：旧 `cache.addAll` 即使已有 favicon 声明也仍会整批失败——预热列表里 `/icon-192.png` 出现两次（favicon 声明与 manifest 图标各一次），而 `Cache.addAll` 对重复请求抛 `InvalidStateError: duplicate requests`。因此票面的根因链只写了 `/favicon.ico` 404，不完整；逐条 `cache.add` 同时解决了 404 与重复 URL 两个诱因。
+
+`npm run smoke` 的失败信息已补上第二个诱因，并新增一条显式的「一个坏 URL 不拖垮同批好 URL」断言。去重本身记在 `draft.md` 的后续清单里。
