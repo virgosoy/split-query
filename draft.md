@@ -8,6 +8,8 @@
 - [x] feat: 显示此程序占用的资源空间
   - 设计已定稿（2026-11-21 grilling）→ 票 `08`（面板）、`09`（空态首用提示）；决定记在 `.scratch/split-query/spec.md` 的「v1.1 追加」
   - 原「主屏豁免提示」并入 09 的空态首用句：依据 WebKit 官方说明（主屏 web app 不属于 Safari、不受 7 天 script-writable storage 清理），**无条件陈述、不做检测**（不读 `navigator.standalone`；`(display-mode: standalone)` 在该场景下反而是坏的——BCD 标注 false/fullscreen、bug 264218，绝不使用）
+- [x] 优化：ios 中点击搜索框时，会自动放大页面，导致横向内容超出页面了，不利于查看结果。
+- [ ] feat：更新提示与手动更新功能
 
 ## 由「资源空间」这一轮引出的后续功能（v1 不做，2026-11-20 记录）
 

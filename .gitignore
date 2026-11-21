@@ -1,6 +1,7 @@
 # Secrets & local-only config
 .mcp.json
 # .claude/settings.local.json
+.claude/commands/
 
 # Node / build artifacts
 node_modules/
