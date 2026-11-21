@@ -49,7 +49,7 @@ function render(list: Item[]): void {
     empty.className = 'empty';
     empty.textContent =
       items.length === 0
-        ? '点击「导入文件」选择你的文本文件（按空行切分条目）。'
+        ? '点击「导入文件」选择你的文本文件（按空行切分条目）。建议添加到主屏后从图标进入：离线可用，且数据不受 Safari 的 7 天清理限制。'
         : '没有匹配的条目。试试换关键词或减少条件。';
     results.appendChild(empty);
     return;
