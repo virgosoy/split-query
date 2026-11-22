@@ -4,6 +4,7 @@ import { isHttpUrl, parseFile, type Item } from './lib/parse';
 import { loadItems, saveItems } from './lib/storage';
 import { formatBytes } from './lib/format';
 import { APP_VERSION } from './version';
+import { initUpdates } from './update';
 
 const app = document.querySelector<HTMLDivElement>('#app');
 if (!app) throw new Error('#app not found');
@@ -14,6 +15,10 @@ app.innerHTML = `
     <button id="import-btn" class="btn" type="button">导入文件</button>
     <input id="file-input" type="file" accept=".txt,text/plain" hidden />
     <button id="usage-btn" class="btn" type="button">存储</button>
+    <button id="update-btn" class="update-btn" type="button" aria-label="检查更新" hidden>
+      <span aria-hidden="true">↻</span>
+      <span id="update-dot" class="update-dot" aria-hidden="true" hidden></span>
+    </button>
     <span id="count" class="count"></span>
   </header>
   <textarea id="search" class="search" rows="2" inputmode="search" autocomplete="off"
@@ -40,6 +45,19 @@ app.innerHTML = `
       </dl>
       <p class="usage-note">只统计本站点脚本可写的存储，不含浏览器 HTTP 缓存与系统快照，因此不等于手机剩余空间的变化量。文件是唯一真源：重新导入整体替换、不累积。</p>
       <button id="usage-close" class="btn" type="button">关闭</button>
+    </div>
+  </div>
+  <div id="update" class="usage update" hidden>
+    <div class="usage-panel" role="dialog" aria-modal="true" aria-labelledby="update-title">
+      <h2 id="update-title" class="usage-title">更新</h2>
+      <dl class="usage-list">
+        <div class="usage-row"><dt>当前版本</dt><dd id="update-version"></dd></div>
+      </dl>
+      <p id="update-status" class="update-status" role="status"></p>
+      <div class="update-actions">
+        <button id="update-close" class="btn" type="button">关闭</button>
+        <button id="update-action" class="btn btn-primary" type="button">检查更新</button>
+      </div>
     </div>
   </div>
 `;
@@ -381,15 +399,9 @@ usageEl.addEventListener('click', (event) => {
   if (event.target === usageEl) closeUsage(); // 点遮罩关闭；点面板内部不关
 });
 
-// 当前版本来自构建注入的 meta；dev 下为 dev。票 13 的更新面板读取它。
+// 当前版本来自构建注入的 meta；dev 下为 dev。更新面板读取它。
 document.documentElement.dataset.appVersion = APP_VERSION;
 
 void init();
 
-if ('serviceWorker' in navigator && import.meta.env.PROD) {
-  window.addEventListener('load', () => {
-    void navigator.serviceWorker
-      .register('./sw.js')
-      .catch((err) => console.warn('Service Worker 注册失败', err));
-  });
-}
+if (import.meta.env.PROD) initUpdates(app);

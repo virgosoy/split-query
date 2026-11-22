@@ -37,7 +37,7 @@ body {
   z-index: 10;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   padding: 12px 0;
   background: var(--bg);
 }
@@ -47,6 +47,8 @@ body {
   font-size: 18px;
   font-weight: 600;
   letter-spacing: 0.3px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .btn {
@@ -66,8 +68,18 @@ body {
 
 .count {
   margin-left: auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12px;
+}
+
+/* 顶栏的按钮不折行；让计数先被压缩/省略，避免按钮文字换行把顶栏撑高 */
+.topbar .btn {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .search {
@@ -261,4 +273,74 @@ body {
   color: var(--muted);
   font-size: 12px;
   line-height: 1.6;
+}
+
+/* ---------- 更新入口与面板 ---------- */
+
+.update-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  padding: 0;
+  border: 1px solid var(--surface-2);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.update-btn:active {
+  background: var(--surface-2);
+}
+
+.update-btn[hidden],
+.update-dot[hidden] {
+  display: none;
+}
+
+.update-dot {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px var(--bg);
+}
+
+.update-status {
+  min-height: 1.6em;
+  margin: 0 0 16px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.update-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.btn-primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #082f49;
+  font-weight: 600;
+}
+
+.btn-primary:active {
+  background: #7dd3fc;
+}
+
+.btn[disabled] {
+  opacity: 0.55;
+  cursor: default;
 }
