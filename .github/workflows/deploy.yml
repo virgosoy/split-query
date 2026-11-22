@@ -3,8 +3,9 @@ name: Deploy to GitHub Pages
 # 前提：仓库 Settings → Pages → Source 选择 “GitHub Actions”。
 # 推送 main/master（或手动触发）后自动构建并将 dist 发布到 GitHub Pages
 # （官方 Pages artifact 流程，直接发布、不生成 gh-pages 分支）。
-# paths 白名单：只有真正影响产物的路径才部署。docs / 票提交不部署，
+# paths 白名单：只有真正影响产物的路径才部署。docs / 票提交 / 测试与驱动脚本不部署，
 # 否则 SW 版本随 commit 变化，会给用户假的「有新版本」提示。
+# scripts 只列参与构建的两个文件；browser.mjs / smoke-offline.mjs 是验证工具，改它们不部署。
 
 "on":
   push:
@@ -17,7 +18,8 @@ name: Deploy to GitHub Pages
       - 'package.json'
       - 'package-lock.json'
       - 'tsconfig.json'
-      - 'scripts/**'
+      - 'scripts/build-sw.mjs'
+      - 'scripts/sw.template.js'
       - '.github/workflows/deploy.yml'
   workflow_dispatch:
 
