@@ -27,4 +27,4 @@
 
 ## 由「随机排序」这一轮引出的后续（2026-11-22 记录）
 
-- [ ] fix: `scripts/browser.mjs` 的 `waitForPageTarget` 用 `child.exitCode !== null` 判死；本机 Chrome 157 / Edge 会把启动器进程甩掉（父进程 `code=0` 退出、浏览器继续运行），导致 `npm run smoke` 的浏览器阶段与人工 CDP 验证都无法启动。应改为继续轮询 DevTools 目标，仅在超时后报告退出码。
+- [x] fix: `scripts/browser.mjs` 的 `waitForPageTarget` 用 `child.exitCode !== null` 判死；本机 Chrome 157 / Edge 会把启动器进程甩掉（父进程 `code=0` 退出、浏览器继续运行），导致 `npm run smoke` 的浏览器阶段与人工 CDP 验证都无法启动。2026-11-22 已修：继续轮询 DevTools 目标、超时后再连同退出码报告；`close()` 先发 `Browser.close` 再等文件句柄释放，避免 `child.kill()` 落空留下无头进程。`npm run smoke` 全链路通过。

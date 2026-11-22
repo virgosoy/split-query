@@ -162,21 +162,35 @@ export async function launch({ url = 'about:blank', width = 390, height = 844 } 
   }
 
   async function close() {
+    // 启动器可能早已退出，child.kill() 会落空；先请浏览器自己退出，避免留下无头进程与临时 profile。
+    try {
+      await Promise.race([send('Browser.close'), sleep(1500)]);
+    } catch {}
     try {
       ws.close();
     } catch {}
-    child.kill();
     try {
-      rmSync(profile, { recursive: true, force: true });
+      child.kill();
     } catch {}
+    // Windows 上浏览器退出后文件句柄释放有延迟，rmSync 可能 EBUSY；重试几次即可。
+    for (let i = 0; i < 5; i++) {
+      try {
+        rmSync(profile, { recursive: true, force: true });
+        break;
+      } catch {
+        await sleep(200);
+      }
+    }
   }
 
   return { send, evaluate, waitFor, setFileInput, setOffline, reload, screenshot, close };
 }
 
 async function waitForPageTarget(port, child) {
+  // 启动器进程退出 ≠ 浏览器没起来：部分 Chrome/Edge（如 Chrome 157）会把启动器甩掉，
+  // 父进程以 code 0 退出、浏览器继续在后台运行，DevTools 端口随后才就绪。
+  // 因此不能拿 child.exitCode 立刻判死，继续轮询；超时后再连同退出码一起报告。
   for (let i = 0; i < 100; i++) {
-    if (child.exitCode !== null) throw new Error(`浏览器启动即退出，code=${child.exitCode}`);
     try {
       const targets = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
       const page = targets.find((t) => t.type === 'page');
@@ -184,5 +198,10 @@ async function waitForPageTarget(port, child) {
     } catch {}
     await sleep(200);
   }
-  throw new Error('等待 DevTools 页面目标超时');
+  const code = child.exitCode;
+  throw new Error(
+    code === null
+      ? '等待 DevTools 页面目标超时'
+      : `等待 DevTools 页面目标超时；启动器已退出，code=${code}`,
+  );
 }

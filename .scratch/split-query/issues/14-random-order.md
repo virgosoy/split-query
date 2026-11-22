@@ -4,7 +4,7 @@
 
 **Blocked by:** 无
 
-**Status:** resolved——本地 CDP 验收通过；iPhone 14 / iOS 16.1.1 真机验收待做；`npm run smoke` 的浏览器阶段被既有 driver 问题挡住（SW 不变量阶段通过，见下）
+**Status:** resolved——本地 CDP 与 `npm run smoke` 均通过；iPhone 14 / iOS 16.1.1 真机验收待做
 
 - [x] `src/lib/order.ts`：`shuffle<T>(items, random)`（Fisher–Yates，不修改入参，随机源注入）；`src/lib/order.test.ts`：不丢不重、空/单元素、给定伪随机序列得到确定排列、入参不变
 - [x] 排序行 UI：结果区上方，「排序」标签 + 原生 `<select>`（`文件顺序` / `随机`）+「换一批」；字号 16px；无条目时整行隐藏
@@ -30,5 +30,5 @@
 | `npm run check` | tsc 无错 + 48 个测试全绿（新增 `order.test.ts` 6 个） |
 | `npm run build` | 构建成功；`dist/sw.js` = `v0.1.0+fa30cb2`，预缓存 8 项 |
 | 本地 CDP（全新 profile，390×844，真实 build/preview，导入 `draft/demo.txt`） | 默认文件顺序；切「随机」后为全排列、「换一批」出现；搜索「百度」得到随机全排列的子序列；清空搜索顺序不变；伪随机 0 下「换一批」输出预期左移；切回文件顺序并隐藏按钮；重新导入保持随机选择且重滚；刷新后从 IndexedDB 恢复并回到文件顺序 |
-| `npm run smoke` | SW 不变量阶段通过；浏览器启动阶段在 `scripts/browser.mjs:179` 报「浏览器启动即退出，code=0」。本机 Chrome 157 / Edge 都会甩掉启动器进程、浏览器继续运行，driver 以 `child.exitCode` 判死属于既有误报，与本次改动无关；本地验收改用容忍该行为的临时驱动完成 |
+| `npm run smoke` | 全链路通过：SW 不变量 + 离线承诺。此前浏览器启动阶段的误判已修（`scripts/browser.mjs` 不再以启动器退出判死，`close()` 先发 `Browser.close`；见 draft.md） |
 | iPhone 14 / iOS 16.1.1 真机 | 待做：重点看下拉与「换一批」聚焦/点击不触发放大，以及随机顺序与「换一批」的实际手感 |
