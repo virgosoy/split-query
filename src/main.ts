@@ -3,6 +3,7 @@ import { buildQuery, buildVocabulary, type VocabEntry } from './lib/query';
 import { isHttpUrl, parseFile, type Item } from './lib/parse';
 import { loadItems, saveItems } from './lib/storage';
 import { formatBytes } from './lib/format';
+import { APP_VERSION } from './version';
 
 const app = document.querySelector<HTMLDivElement>('#app');
 if (!app) throw new Error('#app not found');
@@ -380,22 +381,15 @@ usageEl.addEventListener('click', (event) => {
   if (event.target === usageEl) closeUsage(); // 点遮罩关闭；点面板内部不关
 });
 
+// 当前版本来自构建注入的 meta；dev 下为 dev。票 13 的更新面板读取它。
+document.documentElement.dataset.appVersion = APP_VERSION;
+
 void init();
 
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => {
     void navigator.serviceWorker
       .register('./sw.js')
-      .then(() => navigator.serviceWorker.ready)
-      .then((reg) => {
-        // 预热：首屏资源在 SW 接管前已加载，把同源资源 URL 交给 SW 缓存，一次在线即可离线
-        const urls = performance
-          .getEntriesByType('resource')
-          .map((entry) => entry.name)
-          .filter((url) => url.startsWith(window.location.origin));
-        urls.push(window.location.href);
-        reg.active?.postMessage({ type: 'warmup', urls });
-      })
       .catch((err) => console.warn('Service Worker 注册失败', err));
   });
 }

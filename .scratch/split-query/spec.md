@@ -104,3 +104,27 @@
 ### Implementation Decisions（追加）
 
 - **搜索输入框字号固定 `16px`**：iOS Safari 聚焦计算字号 `< 16px` 的 `input`/`textarea` 时会强制放大页面（15.99px 也触发）；放大后内容宽于视觉视口、可横向拖动，妨碍查看结果。因此 `.search` 的 `font-size: 16px` 是**构建契约，不得下调**。修复一律走字号，不用 `maximum-scale` / `user-scalable=no`（会禁掉用户双指缩放，且 iOS 10+ 对该类声明处理不稳定），不用 JS focus 补丁。
+
+## v1.1 追加（2026-11-22）：更新提示与手动更新
+
+### User Story（追加）
+
+19. 用户想在应用有新版本时看到不打断当前操作的提示，并能一次点击完成更新，以便主屏 PWA 不被长期困在旧版。
+20. 用户想随时手动检查更新，并在没有新版本、离线或检查失败时得到明确回答，以便确认自己用的是不是最新版。
+
+### Implementation Decisions（追加）
+
+- **检测与生效（prompt 模式）**：构建生成 `dist/sw.js`，注入版本 `v<package.version>+<短 commit SHA>` 与完整预缓存清单（`./`、`index.html`、全部哈希 JS/CSS、图标、manifest，构建时去重）。install **不**无条件 `skipWaiting`；新 Service Worker 停在 `waiting`，`waiting` 是「有更新」的**唯一**依据。应用更新 = `SKIP_WAITING` → `skipWaiting` → `controllerchange` → reload（5 秒兜底）。activate 按版本名清理旧 `split-query-*` 缓存并 `clients.claim()`；导航仍网络优先、静态资源仍缓存优先。
+- **全量预缓存取代 warmup**：等待中的新版本自带完整离线资源，即使所有客户端关闭后自动接管，离线冷启动仍可用；删除 `sw.js` 的 warmup 消息处理器与 `main.ts` 的预热代码。票 10 的逐条容错与 draft 的「预热 URL 去重」条目随之作废（票 12 关闭时已标注作废）。
+- **检查时机**：启动一次；每次回到前台（`visibilitychange`）一次；10 分钟内只自动查一次；离线跳过。手动检查（打开更新面板）不受节流限制。自动检查失败静默；手动检查明确显示「当前离线，无法检查」或「检查失败，请稍后再试」。
+- **UI**：顶栏紧凑圆形图标（aria-label「检查更新」），存在 `waiting` 时显示圆点；点开复用模态浮层，显示**当前版本**、状态行与主按钮。主按钮在「检查更新 / 检查中… / 立即更新 / 更新中…」间切换；状态行显示「已是最新 / 发现新版本 / 当前离线，无法检查 / 检查失败，请稍后再试 / 更新正在下载，请稍后再试」。点「立即更新」直接更新并重载，不二次确认，不保留搜索词与滚动位置。不显示新版本号、不做「稍后/忽略」、不做清除缓存或重置；dev 下不渲染更新入口。
+- **版本来源**：`v<package.version>+<短 commit SHA>`。`npm run build` 在 `vite build` 后运行 `scripts/build-sw.mjs`：扫描 `dist/`、把 `dist/index.html` 的版本占位替换为真实版本、由 `scripts/sw.template.js` 生成 `dist/sw.js`。dev 下版本显示 `dev`。
+- **部署**：GitHub Actions 加 `paths:` 白名单（`src/**`、`public/**`、`index.html`、`vite.config.ts`、`package.json`、`package-lock.json`、`tsconfig.json`、`scripts/**`、workflow 自身），docs / 票提交不再触发部署，避免假更新提示。
+- **可靠性兜底**：`registration.update()` 15 秒超时；等新 Service Worker 安装 30 秒；`installed` 后等 `waiting` 2 秒；25ms 轮询；部分 WebKit 先 resolve `update()` 再派发 `updatefound`，故让出一个宏任务；`controllerchange` 5 秒兜底重载；离线跳过自动检查。
+- **测试**：不新增纯 seam。`npm run smoke` 继续验证离线承诺，并新增 `dist/sw.js` 不变量（版本注入、完整预缓存清单、`SKIP_WAITING` 处理器、无无条件 `skipWaiting`）；更新流程人工验收（含 iPhone 14 / iOS 16.1.1 真机）。
+
+### Out of Scope（追加）
+
+- 不用 `version.json` 或轮询版本文件判断更新：`waiting` Service Worker 是唯一依据。
+- 不做自动静默更新、离线就绪横幅、「稍后/忽略」、清除缓存 / 重置应用。
+- 不新增第二条自动化更新流 smoke（可作为后续票）。

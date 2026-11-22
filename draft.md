@@ -10,6 +10,7 @@
   - 原「主屏豁免提示」并入 09 的空态首用句：依据 WebKit 官方说明（主屏 web app 不属于 Safari、不受 7 天 script-writable storage 清理），**无条件陈述、不做检测**（不读 `navigator.standalone`；`(display-mode: standalone)` 在该场景下反而是坏的——BCD 标注 false/fullscreen、bug 264218，绝不使用）
 - [x] 优化：ios 中点击搜索框时，会自动放大页面，导致横向内容超出页面了，不利于查看结果。
 - [ ] feat：更新提示与手动更新功能
+  - 设计已定稿（2026-11-22 grilling）→ 票 `12`（SW 更新管线）、`13`（更新提示 UI）；决定记在 `docs/adr/0002-prompt-mode-updates.md` 与 `.scratch/split-query/spec.md` 的「v1.1 追加」
 
 ## 由「资源空间」这一轮引出的后续功能（v1 不做，2026-11-20 记录）
 
@@ -18,4 +19,4 @@
 - [ ] feat: 面板里给「查看 / 清理系统站点数据」的引导。需要先核实 iOS 16.1 上真实可达的路径，不能凭空写文案
 - [ ] fix: 最近搜索只在内存里（`src/main.ts` 的 `recent` 数组未落盘），刷新即失 —— 不是本轮范围，读代码时发现的真实缺口
 - [ ] feat: 系统配额 / 已用（`navigator.storage.estimate()` 的 `usage` / `quota`）—— iOS 16.1 上此 API 不存在（落在 Safari 17 / iOS 17：MDN BCD `api/StorageManager.json` `version_added: "17"`，WebKit 的 Safari 17 beta 公告列为 "newly supported"）。将来升到 iOS 17 后可直接读出「已用 / 上限」，届时给面板加一行；v1 不写这段探测分支（在目标设备上永远不渲染 = 无法人工验证 = 负债）
-- [ ] fix: 预热 URL 去重（同一 URL 在 warmup 列表出现两次——favicon 与 manifest 都指向 `icon-192.png`；per-URL `cache.add` 会重复请求，旧 `cache.addAll` 会因 `InvalidStateError: duplicate requests` 整批失败）。2026-11-21 retro 发现
+- [x] fix: 预热 URL 去重（同一 URL 在 warmup 列表出现两次——favicon 与 manifest 都指向 `icon-192.png`；per-URL `cache.add` 会重复请求，旧 `cache.addAll` 会因 `InvalidStateError: duplicate requests` 整批失败）。2026-11-21 retro 发现；2026-11-22 票 12 删除 warmup 后本项作废

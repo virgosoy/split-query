@@ -1,21 +1,23 @@
 /**
- * 离线冒烟检查：本应用的头号承诺是「一次在线访问后即可离线」。
+ * 离线与 SW 更新管线冒烟检查。
  *
- * 它不属于任何纯 seam，UI 与 Service Worker 又都是"人工验证"，于是这条承诺此前
- * 没有任何自动检查——票 06 的实现从落地起就是坏的（/favicon.ico 的 404 让预热的
- * cache.addAll 整批 reject，又被 catch 吞掉），直到票 08 验收才被发现。这个脚本
- * 补那条盲区，并且红在真缺陷上：
+ * 本应用有两条跨层承诺，都没有纯 seam 可测：
+ *   1. 「一次在线访问后即可离线」——票 06 曾因预热整批失败而静默失效，直到票 08 才发现。
+ *   2. 「新版本先停在 waiting，等用户确认」——票 12 的 prompt 模式；若有人把
+ *      无条件 skipWaiting 加回去，更新提示就永远不会出现。
  *
- *   1. 全新 profile 在线打开一次 → 断言 .js 与 .css 已进缓存（预热生效）
- *   2. 同批预热里一个 URL 失败 → 断言好 URL 仍进缓存（逐条容错）
- *   3. 断网刷新 → 断言应用仍能渲染（证明离线可用）
+ * 这个脚本用全新 profile 验证：
+ *   1. 本地构建时，dist/sw.js 含版本、完整预缓存清单、SKIP_WAITING，且没有无条件 skipWaiting
+ *   2. 全新 profile 在线打开一次 → .js 与 .css 已进缓存（全量预缓存生效）
+ *   3. 断网刷新 → 应用仍能渲染（离线可用）
  *
  * 用法：
  *   npm run smoke                      # 构建 + 本地预览 + 检查
  *   node scripts/smoke-offline.mjs --url https://virgosoy.github.io/split-query/
- *                                      # 对线上地址检查（不构建、不起预览）
+ *                                      # 对线上地址检查（不构建、不起预览；跳过 dist 不变量）
  */
 import { spawn } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { freePort, launch } from './browser.mjs';
 
@@ -30,11 +32,14 @@ function fail(message) {
 const args = process.argv.slice(2);
 const urlFlag = args.indexOf('--url');
 let url = urlFlag >= 0 ? args[urlFlag + 1] : null;
+const localBuild = !url;
 let server = null;
 let browser = null;
 
 try {
-  if (!url) {
+  if (localBuild) {
+    verifySwArtifacts();
+
     const port = await freePort();
     const viteBin = fileURLToPath(new URL('../node_modules/vite/bin/vite.js', import.meta.url));
     server = spawn(
@@ -55,8 +60,8 @@ try {
   });
   if (!ready) fail('Service Worker 未在 20 秒内接管页面。');
 
-  // 2) 一次在线访问后，带哈希的静态资源应已进缓存（即预热生效）。
-  //    要求 .js 与 .css 同时存在：只看「任意 /assets/」会漏掉 CSS 单独失败的部分预热。
+  // 2) 一次在线访问后，带哈希的静态资源应已进缓存（即全量预缓存生效）。
+  //    要求 .js 与 .css 同时存在：只看「任意 /assets/」会漏掉 CSS 单独失败的部分预缓存。
   const cachedAssets = await browser.waitFor(
     `(async () => {
       const paths = [];
@@ -74,45 +79,12 @@ try {
     const inventory = await cacheInventory(browser);
     fail(
       '预缓存里缺少完整的 /assets/ 资源（需要 .js 与 .css）——「一次在线即离线」不成立。\n' +
-        '  常见诱因：预热用 cache.addAll（全有或全无），一个 URL 失败就会让整批 reject。\n' +
-        '  失败可能是 404（如 /favicon.ico），也可能是重复 URL\n' +
-        '  （InvalidStateError: duplicate requests，例如 favicon 与 manifest 都指向 icon-192.png）。\n' +
+        '  检查 dist/sw.js 的 PRECACHE 是否覆盖全部构建产物。\n' +
         `  当前缓存：${inventory}`,
     );
   }
 
-  // 3) 逐条容错：同一批预热里一个 URL 失败，不能拖垮其余 URL。
-  //    这是票 10 的核心属性；不能只靠浏览器恰好请求了重复 URL 来间接覆盖。
-  const probeGood = await browser.evaluate(
-    `(async () => {
-      const good = new URL('icon-192.png?warmup-probe=' + Date.now(), location.href).href;
-      // 带 credentials 的同源 URL：通过 SW 的同源过滤，但 cache.add 会以 TypeError 拒绝。
-      const bad = location.protocol + '//user:pass@' + location.host + '/warmup-probe-missing.js';
-      const reg = await navigator.serviceWorker.ready;
-      reg.active.postMessage({ type: 'warmup', urls: [good, bad] });
-      return good;
-    })()`,
-    { awaitPromise: true },
-  );
-  if (!probeGood) fail('无法向 Service Worker 发送预热探测消息（reg.active 为空）。');
-  const probeCached = await browser.waitFor(
-    `(async () => {
-      for (const name of await caches.keys()) {
-        const cache = await caches.open(name);
-        if (await cache.match(${JSON.stringify(probeGood)})) return true;
-      }
-      return false;
-    })()`,
-    { awaitPromise: true, timeout: 10000 },
-  );
-  if (!probeCached) {
-    fail(
-      '逐条容错失效：同一批预热里有一个失败 URL 时，好 URL 也没进缓存。\n' +
-        '  预热必须逐条 cache.add 并各自 catch；cache.addAll 是全有或全无。',
-    );
-  }
-
-  // 4) 断网刷新 → 应用仍应渲染（JS 从缓存取到并执行）
+  // 3) 断网刷新 → 应用仍应渲染（JS 从缓存取到并执行）
   await browser.setOffline(true);
   await browser.reload();
   const rendered = await browser.waitFor(
@@ -129,6 +101,51 @@ try {
 } finally {
   if (browser) await browser.close();
   if (server) server.kill();
+}
+
+/** 构建产物不变量：版本注入、全量预缓存、prompt 模式。 */
+function verifySwArtifacts() {
+  const distFile = (name) => fileURLToPath(new URL(`../dist/${name}`, import.meta.url));
+  if (!existsSync(distFile('sw.js'))) fail('dist/sw.js 不存在；先跑 npm run build。');
+
+  const html = readFileSync(distFile('index.html'), 'utf8');
+  const meta = html.match(/<meta name="app-version" content="([^"]+)"/);
+  if (!meta) fail('dist/index.html 缺少 app-version meta——版本没有注入。');
+  const version = meta[1];
+  if (!/^v[^\s"'<>]+\+[^\s"'<>]+$/.test(version)) {
+    fail(`版本格式不对：${version}（期望 v<package.version>+<短 SHA>）`);
+  }
+
+  const sw = readFileSync(distFile('sw.js'), 'utf8');
+  if (!sw.includes(version)) fail(`dist/sw.js 未包含与 index.html 一致的版本 ${version}。`);
+  if (!/SKIP_WAITING[\s\S]{0,160}self\.skipWaiting\(\)/.test(sw)) {
+    fail('dist/sw.js 缺少 SKIP_WAITING 消息处理器——用户无法确认更新。');
+  }
+  const skipCount = (sw.match(/self\.skipWaiting\(\)/g) ?? []).length;
+  if (skipCount !== 1) {
+    fail(
+      `self.skipWaiting() 出现 ${skipCount} 次；install 不得无条件 skipWaiting，` +
+        '只允许 SKIP_WAITING 处理器调用一次。',
+    );
+  }
+
+  const precacheMatch = sw.match(/const PRECACHE = (\[[\s\S]*?\]);/);
+  if (!precacheMatch) fail('dist/sw.js 缺少 PRECACHE 清单。');
+  let precache;
+  try {
+    precache = JSON.parse(precacheMatch[1]);
+  } catch (error) {
+    fail(`dist/sw.js 的 PRECACHE 不是合法 JSON：${error.message}`);
+  }
+  if (!Array.isArray(precache) || precache.length === 0) fail('PRECACHE 为空。');
+  if (new Set(precache).size !== precache.length) fail('PRECACHE 有重复 URL。');
+  for (const required of ['./', './index.html']) {
+    if (!precache.includes(required)) fail(`PRECACHE 缺少 ${required}。`);
+  }
+  if (!precache.some((path) => path.endsWith('.js'))) fail('PRECACHE 缺少 JS 资源。');
+  if (!precache.some((path) => path.endsWith('.css'))) fail('PRECACHE 缺少 CSS 资源。');
+
+  console.log(`OK  SW 更新管线不变量：${version}，预缓存 ${precache.length} 项`);
 }
 
 async function waitForHttp(target) {
