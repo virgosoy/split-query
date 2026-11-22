@@ -12,6 +12,9 @@
 - [x] feat：更新提示与手动更新功能
   - 设计已定稿（2026-11-22 grilling）→ 票 `12`（SW 更新管线）、`13`（更新提示 UI）；决定记在 `docs/adr/0002-prompt-mode-updates.md` 与 `.scratch/split-query/spec.md` 的「v1.1 追加」
   - 实现完成（2026-11-22）：票 12、13 均已 resolved；本地 CDP 全链路验收通过，iPhone 14 / iOS 16.1.1 真机验收待做
+- [x] feat: 按需随机排序（结果区排序下拉：文件顺序 / 随机 + 换一批）
+  - 设计已定稿（2026-11-22 grilling）→ 票 `14`；决定记在 `.scratch/split-query/spec.md` 的「v1.1 追加」
+  - 实现完成（2026-11-22）：票 14 本地 CDP 验收通过；iPhone 14 / iOS 16.1.1 真机验收待做
 
 ## 由「资源空间」这一轮引出的后续功能（v1 不做，2026-11-20 记录）
 
@@ -21,3 +24,7 @@
 - [ ] fix: 最近搜索只在内存里（`src/main.ts` 的 `recent` 数组未落盘），刷新即失 —— 不是本轮范围，读代码时发现的真实缺口
 - [ ] feat: 系统配额 / 已用（`navigator.storage.estimate()` 的 `usage` / `quota`）—— iOS 16.1 上此 API 不存在（落在 Safari 17 / iOS 17：MDN BCD `api/StorageManager.json` `version_added: "17"`，WebKit 的 Safari 17 beta 公告列为 "newly supported"）。将来升到 iOS 17 后可直接读出「已用 / 上限」，届时给面板加一行；v1 不写这段探测分支（在目标设备上永远不渲染 = 无法人工验证 = 负债）
 - [x] fix: 预热 URL 去重（同一 URL 在 warmup 列表出现两次——favicon 与 manifest 都指向 `icon-192.png`；per-URL `cache.add` 会重复请求，旧 `cache.addAll` 会因 `InvalidStateError: duplicate requests` 整批失败）。2026-11-21 retro 发现；2026-11-22 票 12 删除 warmup 后本项作废
+
+## 由「随机排序」这一轮引出的后续（2026-11-22 记录）
+
+- [ ] fix: `scripts/browser.mjs` 的 `waitForPageTarget` 用 `child.exitCode !== null` 判死；本机 Chrome 157 / Edge 会把启动器进程甩掉（父进程 `code=0` 退出、浏览器继续运行），导致 `npm run smoke` 的浏览器阶段与人工 CDP 验证都无法启动。应改为继续轮询 DevTools 目标，仅在超时后报告退出码。

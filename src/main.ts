@@ -1,6 +1,7 @@
 import './styles.css';
 import { buildQuery, buildVocabulary, type VocabEntry } from './lib/query';
 import { isHttpUrl, parseFile, type Item } from './lib/parse';
+import { shuffle } from './lib/order';
 import { loadItems, saveItems } from './lib/storage';
 import { formatBytes } from './lib/format';
 import { APP_VERSION } from './version';
@@ -34,6 +35,14 @@ app.innerHTML = `
     <button id="btn-kline" class="op" type="button">仅关键词行</button>
   </div>
   <div id="recent" class="recent" hidden></div>
+  <div id="sortbar" class="sortbar" hidden>
+    <label class="sort-label" for="sort-select">排序</label>
+    <select id="sort-select" class="sort-select">
+      <option value="file">文件顺序</option>
+      <option value="random">随机</option>
+    </select>
+    <button id="reroll" class="chip sort-reroll" type="button" hidden>换一批</button>
+  </div>
   <main id="results" class="results"></main>
   <div id="usage" class="usage" hidden>
     <div class="usage-panel" role="dialog" aria-modal="true" aria-labelledby="usage-title">
@@ -69,6 +78,9 @@ const results = app.querySelector<HTMLElement>('#results')!;
 const search = app.querySelector<HTMLTextAreaElement>('#search')!;
 const suggest = app.querySelector<HTMLDivElement>('#suggest')!;
 const recentEl = app.querySelector<HTMLDivElement>('#recent')!;
+const sortbarEl = app.querySelector<HTMLDivElement>('#sortbar')!;
+const sortSelect = app.querySelector<HTMLSelectElement>('#sort-select')!;
+const rerollBtn = app.querySelector<HTMLButtonElement>('#reroll')!;
 const usageBtn = app.querySelector<HTMLButtonElement>('#usage-btn')!;
 const usageEl = app.querySelector<HTMLDivElement>('#usage')!;
 const usageItemsEl = app.querySelector<HTMLElement>('#usage-items')!;
@@ -78,6 +90,11 @@ const usageTotalEl = app.querySelector<HTMLElement>('#usage-total')!;
 
 let items: Item[] = [];
 let vocab: VocabEntry[] = [];
+
+type SortMode = 'file' | 'random';
+let sortMode: SortMode = 'file';
+/** 随机模式下的全排列；搜索只取它的子序列，故输入时不重滚。 */
+let randomOrder: Item[] = [];
 
 // ---------- 渲染 ----------
 
@@ -123,8 +140,21 @@ function render(list: Item[]): void {
 }
 
 function renderFiltered(): void {
-  render(items.filter(buildQuery(search.value)));
+  const base = sortMode === 'random' ? randomOrder : items;
+  render(base.filter(buildQuery(search.value)));
+  syncSortbar();
   updateSuggestions();
+}
+
+/** 排序行只在有条目时出现；「换一批」只在随机模式下出现。 */
+function syncSortbar(): void {
+  sortbarEl.hidden = items.length === 0;
+  rerollBtn.hidden = sortMode !== 'random';
+}
+
+/** 按当前条目重滚一次全排列（只在随机模式下调用）。 */
+function rollRandomOrder(): void {
+  randomOrder = shuffle(items);
 }
 
 // ---------- 搜索框工具 ----------
@@ -279,6 +309,8 @@ function applyItems(source: Item[]): void {
   items = source;
   vocab = buildVocabulary(items);
   countEl.textContent = `${items.length} 条目`;
+  // 排序选择是视图状态：重新导入不改变它；随机模式为新数据滚新排列
+  if (sortMode === 'random') rollRandomOrder();
   renderFiltered();
 }
 
@@ -386,6 +418,17 @@ fileInput.addEventListener('change', () => {
 });
 search.addEventListener('input', renderFiltered);
 search.addEventListener('change', () => rememberRecent(search.value));
+
+sortSelect.addEventListener('change', () => {
+  sortMode = sortSelect.value === 'random' ? 'random' : 'file';
+  if (sortMode === 'random') rollRandomOrder();
+  renderFiltered();
+});
+rerollBtn.addEventListener('click', () => {
+  if (sortMode !== 'random') return;
+  rollRandomOrder();
+  renderFiltered();
+});
 
 for (const btn of app.querySelectorAll<HTMLButtonElement>('.op[data-op]')) {
   btn.addEventListener('click', () => applyFieldOp(btn.dataset.op ?? ''));

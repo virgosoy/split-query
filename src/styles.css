@@ -154,6 +154,42 @@ body {
   white-space: nowrap;
 }
 
+/* ---------- 排序方式 ---------- */
+
+.sortbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+}
+
+/* display 被上面覆盖，故 hidden 需显式生效 */
+.sortbar[hidden] {
+  display: none;
+}
+
+.sort-label {
+  color: var(--muted);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.sort-select {
+  border: 1px solid var(--surface-2);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  /* 16px 是 iOS Safari 聚焦表单控件不自动放大的硬阈值；不得下调。 */
+  font-size: 16px;
+  font-family: inherit;
+  padding: 5px 8px;
+}
+
+.sort-reroll {
+  margin-left: auto;
+  font-size: 16px;
+}
+
 .results {
   display: flex;
   flex-direction: column;
