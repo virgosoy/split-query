@@ -10,6 +10,22 @@ import { initUpdates } from './update';
 const app = document.querySelector<HTMLDivElement>('#app');
 if (!app) throw new Error('#app not found');
 
+/** 工具栏字段算子按钮；数组顺序即展示顺序。 */
+const FIELD_OPS = [
+  { op: 'k:', label: '关键词' },
+  { op: 'k^:', label: '关键词^' },
+  { op: 'k$:', label: '关键词$' },
+  { op: 'k^$:', label: '关键词^$' },
+  { op: 'h:', label: '首词' },
+  { op: 'h^:', label: '首词^' },
+  { op: 'h$:', label: '首词$' },
+  { op: 'h^$:', label: '首词^$' },
+] as const;
+
+const fieldOpButtons = FIELD_OPS.map(
+  ({ op, label }) => `<button class="op" data-op="${op}" type="button">${label}</button>`,
+).join('\n    ');
+
 app.innerHTML = `
   <header class="topbar">
     <h1 class="brand">split-query</h1>
@@ -26,14 +42,7 @@ app.innerHTML = `
     placeholder="搜索：同行空格 AND · 换行 OR（k: 关键词 / h: 首词 / ^ $ ^$ / ! 排除）"></textarea>
   <div id="suggest" class="suggest" hidden></div>
   <div id="toolbar" class="toolbar">
-    <button class="op" data-op="k:" type="button">关键词</button>
-    <button class="op" data-op="k^:" type="button">关键词^</button>
-    <button class="op" data-op="k$:" type="button">关键词$</button>
-    <button class="op" data-op="k^$:" type="button">关键词^$</button>
-    <button class="op" data-op="h:" type="button">首词</button>
-    <button class="op" data-op="h^:" type="button">首词^</button>
-    <button class="op" data-op="h$:" type="button">首词$</button>
-    <button class="op" data-op="h^$:" type="button">首词^$</button>
+    ${fieldOpButtons}
     <button id="btn-exclude" class="op" type="button">排除!</button>
   </div>
   <div id="recent" class="recent" hidden></div>
