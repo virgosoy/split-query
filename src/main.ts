@@ -23,16 +23,18 @@ app.innerHTML = `
     <span id="count" class="count"></span>
   </header>
   <textarea id="search" class="search" rows="2" inputmode="search" autocomplete="off"
-    placeholder="搜索：同行空格 AND · 换行 OR（k: 关键词行 / h: 首词 / ^ $ ^$ / ! 排除）"></textarea>
+    placeholder="搜索：同行空格 AND · 换行 OR（k: 关键词 / h: 首词 / ^ $ ^$ / ! 排除）"></textarea>
   <div id="suggest" class="suggest" hidden></div>
   <div id="toolbar" class="toolbar">
-    <button class="op" data-op="k:" type="button">关键词行</button>
+    <button class="op" data-op="k:" type="button">关键词</button>
+    <button class="op" data-op="k^:" type="button">关键词^</button>
+    <button class="op" data-op="k$:" type="button">关键词$</button>
+    <button class="op" data-op="k^$:" type="button">关键词^$</button>
     <button class="op" data-op="h:" type="button">首词</button>
     <button class="op" data-op="h^:" type="button">首词^</button>
     <button class="op" data-op="h$:" type="button">首词$</button>
-    <button class="op" data-op="h^$:" type="button">首词精确</button>
+    <button class="op" data-op="h^$:" type="button">首词^$</button>
     <button id="btn-exclude" class="op" type="button">排除!</button>
-    <button id="btn-kline" class="op" type="button">仅关键词行</button>
   </div>
   <div id="recent" class="recent" hidden></div>
   <div id="sortbar" class="sortbar" hidden>
@@ -189,21 +191,6 @@ function toggleExclude(): void {
     tokens[i] = tokens[i].startsWith('!') ? tokens[i].slice(1) : '!' + tokens[i];
     return tokens;
   });
-  if (changed) {
-    search.focus();
-    renderFiltered();
-  }
-}
-
-/** 把当前行每个词改写为 k: / !k: 形式（已有字段算子的不动）。 */
-function keywordLineOnly(): void {
-  const changed = editCurrentLine((tokens) =>
-    tokens.map((tok) => {
-      const { neg, core } = stripNeg(tok);
-      if (hasFieldOp(core)) return tok;
-      return `${neg}k:${core}`;
-    }),
-  );
   if (changed) {
     search.focus();
     renderFiltered();
@@ -434,7 +421,6 @@ for (const btn of app.querySelectorAll<HTMLButtonElement>('.op[data-op]')) {
   btn.addEventListener('click', () => applyFieldOp(btn.dataset.op ?? ''));
 }
 app.querySelector<HTMLButtonElement>('#btn-exclude')!.addEventListener('click', toggleExclude);
-app.querySelector<HTMLButtonElement>('#btn-kline')!.addEventListener('click', keywordLineOnly);
 
 usageBtn.addEventListener('click', openUsage);
 app.querySelector<HTMLButtonElement>('#usage-close')!.addEventListener('click', closeUsage);
