@@ -8,7 +8,8 @@ Issues and specs for this repo live as markdown files in `.scratch/`.
 - The spec is `.scratch/<feature-slug>/spec.md`
 - Implementation issues are one file per ticket at `.scratch/<feature-slug>/issues/<NN>-<slug>.md`, numbered from `01`, never a single combined tickets file
 - Triage state is recorded as a `Status:` line near the top of each issue file
-- Comments and conversation history append to the bottom of the file under a `## Comments` heading. Implementation notes and verification records append there too, under their own level-2 heading when they are substantial (`## 实现说明`, `## 验证记录`).
+- Comments and conversation history append to the bottom of the file under a `## Comments` heading. Implementation notes and verification records are top-level `##` sections, not nested under `## Comments`: use `## 实现说明` and `## 验证记录` when they are substantial, matching the existing ticket files.
+- When a later ticket removes or changes a resolved ticket's scope, annotate the original ticket inline in its `What to build` and checklist, with the superseding ticket and date. An appendix alone is not enough.
 
 ## When a skill says "publish to the issue tracker"
 

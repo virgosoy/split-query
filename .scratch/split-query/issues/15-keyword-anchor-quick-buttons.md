@@ -20,6 +20,7 @@
 
 - **`src/main.ts`**：工具栏按字段分组为 `关键词 | 关键词^ | 关键词$ | 关键词^$ | 首词 | 首词^ | 首词$ | 首词^$ | 排除!`。字段按钮由 `FIELD_OPS` 配置数组渲染（数组顺序即展示顺序），避免同一标记重复 8 次；「排除!」仍是独立按钮。新增按钮复用现有 `applyFieldOp()` 预设模型，不新增状态或事件分支；删除 `keywordLineOnly()` 与其监听。占位符同步为「k: 关键词」。
 - **未触碰**：`src/lib/query.ts` 及其测试（`k^:` / `k$:` / `k^$:` 语法早已支持）、`sw.js` / 构建脚本 / 缓存管线。
+- **验证工具**：新增 `scripts/verify-quick-input.mjs` 与 `scripts/fixtures/ui-quick-input.txt`，复用 `scripts/browser.mjs`，手动运行；`CLAUDE.md` 增加 UI check 指针。
 - **文档**：spec 增加「v1.1 追加（2026-11-23）：关键词锚点快捷按钮」；票 04 加注移除项；GLOSSARY 的「关键词行」补界面简称；`draft.md` 记录「自动补全支持字段前缀」后续项。
 
 ## 验证记录（2026-11-23）
@@ -33,5 +34,6 @@
 | 按钮 + 查询端到端 | 裸词「百度」按「关键词^」写入 `k^:百度`，结果区只显示「百度 谷歌 必应」 |
 | 工具栏布局（390px） | 两行、宽 358、高 60、无横向溢出；截图人工检查通过 |
 | code-review 后回归（2026-11-23） | 字段按钮改为 `FIELD_OPS` 配置数组；`npm run check` 48 tests 全绿；本地 CDP 29 项断言重跑全部通过 |
+| 脚本化回归（2026-11-23） | `node scripts/verify-quick-input.mjs` 自动起 Vite dev server，29 项断言全部通过；fixture 固定为 3 条目 |
 | `npm run smoke` | 未跑：改动只涉及 UI 按钮，不触碰 `sw.js` / 构建脚本 / 构建产物；按本轮共识不需要 |
 | iPhone 14 / iOS 16.1.1 真机 | 待做：重点看两行按钮的实际点击手感与标签可读性 |
