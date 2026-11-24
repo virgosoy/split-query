@@ -15,6 +15,7 @@
 - [x] feat: 按需随机排序（结果区排序下拉：文件顺序 / 随机 + 换一批）
   - 设计已定稿（2026-11-22 grilling）→ 票 `14`；决定记在 `.scratch/split-query/spec.md` 的「v1.1 追加」
   - 实现完成（2026-11-22）：票 14 本地 CDP 验收通过；iPhone 14 / iOS 16.1.1 真机验收待做
+- [ ] feat：首词为“地址”的 item，找到其每一行为 url 地址的行。在其他非首词为“地址”的 item 中，如果其中的 url 的前缀（`http[s]://host[:port]/`）这部分如果和 “地址” item url 行的前缀匹配上，那么增加一个功能，该 url 可以选择使用匹配到的 “地址” item 的其他 url 行前缀去替换并打开。
 
 ## 由「资源空间」这一轮引出的后续功能（v1 不做，2026-11-20 记录）
 
@@ -23,7 +24,7 @@
 - [ ] feat: 面板里给「查看 / 清理系统站点数据」的引导。需要先核实 iOS 16.1 上真实可达的路径，不能凭空写文案
 - [ ] fix: 最近搜索只在内存里（`src/main.ts` 的 `recent` 数组未落盘），刷新即失 —— 不是本轮范围，读代码时发现的真实缺口
 - [ ] feat: 系统配额 / 已用（`navigator.storage.estimate()` 的 `usage` / `quota`）—— iOS 16.1 上此 API 不存在（落在 Safari 17 / iOS 17：MDN BCD `api/StorageManager.json` `version_added: "17"`，WebKit 的 Safari 17 beta 公告列为 "newly supported"）。将来升到 iOS 17 后可直接读出「已用 / 上限」，届时给面板加一行；v1 不写这段探测分支（在目标设备上永远不渲染 = 无法人工验证 = 负债）
-- [x] fix: 预热 URL 去重（同一 URL 在 warmup 列表出现两次——favicon 与 manifest 都指向 `icon-192.png`；per-URL `cache.add` 会重复请求，旧 `cache.addAll` 会因 `InvalidStateError: duplicate requests` 整批失败）。2026-11-21 retro 发现；2026-11-22 票 12 删除 warmup 后本项作废
+- [-] fix: 预热 URL 去重（同一 URL 在 warmup 列表出现两次——favicon 与 manifest 都指向 `icon-192.png`；per-URL `cache.add` 会重复请求，旧 `cache.addAll` 会因 `InvalidStateError: duplicate requests` 整批失败）。2026-11-21 retro 发现；2026-11-22 票 12 删除 warmup 后本项作废
 
 ## 由「随机排序」这一轮引出的后续（2026-11-22 记录）
 
