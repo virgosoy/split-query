@@ -37,7 +37,7 @@
 
 - **架构**：无服务器纯静态 PWA；数据本地优先、运行时导入（ADR-0001）；应用不内嵌网页，链接一律交系统浏览器。
 - **数据流**：文件（运行时导入）→ 解析为条目（parse seam）→（可选：查询谓词过滤，entry seam）→ 渲染为条目卡片。
-- **测试 seam（均为纯函数，v1 的自动化测试边界；v1.1 追加 format / order）**：
+- **测试 seam（均为纯函数，v1 的自动化测试边界；v1.1 追加 format / order / search-text）**：
   - **parse seam**：`文本 → 条目[]`。捕获空行切分、关键词行/首词/其他行划分、URL 识别、空白边界。
   - **query seam**：`搜索文本 → (条目)=>boolean`。捕获全部语法矩阵、大小写与半全角冒号归一、文件顺序保持（谓词不改变顺序）。
 - UI 与 IndexedDB 为薄胶水，v1 不设自动化 seam（本地起 Vite 人工验证）。
@@ -48,7 +48,7 @@
 
 ## Testing Decisions
 
-- 测试只经公开纯 seam（parse / query / format / order），不触碰内部实现；断言值来自**独立来源**（已知好值、规格语法矩阵字面量），避免与实现同算式。
+- 测试只经公开纯 seam（parse / query / format / order / search-text），不触碰内部实现；断言值来自**独立来源**（已知好值、规格语法矩阵字面量），避免与实现同算式。
 - **parse seam**：已知文本 → 精确的条目结构断言。
 - **query seam**：一张**语法矩阵表**驱动的参数化用例：对每条算子/组合给定「查询 + 命中/不命中条目」。
 - 不使用 fake-indexeddb / jsdom（薄胶水人工验）。
@@ -169,3 +169,17 @@
 ### Out of Scope（追加）
 
 - 不让自动补全在字段前缀后继续工作（`k:` / `k^:` 等之后仍隐藏候选）；该缺口记在 `draft.md`。
+
+## v1.1 追加（2026-11-24）：搜索文本编辑 seam
+
+### Implementation Decisions（追加）
+
+- **行为不变的重构**：把 `main.ts` 里的当前行读取/改写、算子 inventory（`FIELD_OPS`）与补全过滤抽成纯 seam `src/lib/search-text.ts`（`editSearchText`、`completions`）；`main.ts` 只保留 DOM wiring，focus/render 时机不变。
+- **grammar 单一来源**：`query.ts` 导出 `splitToken`（`negate` / `prefix` / `value`；前缀与值保留原文大小写与半/全角冒号），`parseTerm` 改用它解析字段与匹配模式。
+- **唯一已知行为收紧**：非法锚点顺序（如 `k$^:`）不再被工具栏当作字段前缀，而是按裸词处理；与 query 的合法语法一致，用测试固定。
+- **测试边界**：新增 `src/lib/search-text.test.ts` 并补 `query.test.ts` 的 `splitToken` 用例；`CLAUDE.md` 的纯 seam 数量由四改五。不新增 ADR，不新增 GLOSSARY 术语。
+
+### Out of Scope（追加）
+
+- 仍不做字段前缀后的自动补全（记在 `draft.md` 的后续项）。
+- 不改搜索语法、算子集合或 UI 标签。

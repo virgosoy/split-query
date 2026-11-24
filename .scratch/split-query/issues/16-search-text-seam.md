@@ -4,15 +4,15 @@
 
 **Blocked by:** 无
 
-**Status:** open——refactor only；待实现
+**Status:** resolved——纯重构，行为不变；`npm run check` 与 `node scripts/verify-quick-input.mjs` 通过
 
-- [ ] `query.ts` 导出 `splitToken`，`parseTerm` 改用它
-- [ ] 新增 `src/lib/search-text.ts`：`FIELD_OPS`、`editSearchText`、`completions`
-- [ ] 新增 `src/lib/search-text.test.ts`，并补 `query.test.ts` 的 `splitToken` 用例
-- [ ] `main.ts` 改用 module，删除本地 grammar/当前行工具/`FIELD_OPS`
-- [ ] 文档：`CLAUDE.md` seam 四改五、`CODING_STANDARDS.md` pure seam 列表、`spec.md` v1.1 追加
-- [ ] `npm run check` 通过
-- [ ] `node scripts/verify-quick-input.mjs` 通过（行为不变）
+- [x] `query.ts` 导出 `splitToken`，`parseTerm` 改用它
+- [x] 新增 `src/lib/search-text.ts`：`FIELD_OPS`、`editSearchText`、`completions`
+- [x] 新增 `src/lib/search-text.test.ts`，并补 `query.test.ts` 的 `splitToken` 用例
+- [x] `main.ts` 改用 module，删除本地 grammar/当前行工具/`FIELD_OPS`
+- [x] 文档：`CLAUDE.md` seam 四改五、`CODING_STANDARDS.md` pure seam 列表、`spec.md` v1.1 追加
+- [x] `npm run check` 通过
+- [x] `node scripts/verify-quick-input.mjs` 通过（行为不变）
 
 ## 设计决定
 
@@ -113,3 +113,18 @@ export function splitToken(token: string): SplitToken;
 - 架构评审 Candidate 1（temp HTML，未入仓库）
 - 票 15：关键词锚点快捷按钮
 - `draft.md`：自动补全支持字段前缀（后续项）
+
+## 实现说明
+
+- **`src/lib/query.ts`**：新增导出 `SplitToken` 与 `splitToken(token)`；前缀正则抽为 `FIELD_PREFIX_RE`，`parseTerm` 改为读取 `prefix` / `value`，行为与旧实现一致（`k$^:` 旧正则本就不识别，故 query 侧无变化）。
+- **`src/lib/search-text.ts`**：`FIELD_OPS` 与标签从 `main.ts` 移入；`editSearchText(text, edit)` 为 text → text 纯函数，`SearchEdit` 三种 action（`fieldOp` / `toggleExclude` / `complete`）；`completions(text, words)` 接收纯词数组。
+- **`src/main.ts`**：删除 `FIELD_OP_RE` / `hasFieldOp` / `stripNeg` / `editCurrentLine` / `toggleExclude` / `applyFieldOp` 的本地实现与本地 `FIELD_OPS`，只保留事件接线。`fieldOp` 仍无条件 focus/render；`toggleExclude` / `complete` 用「文本是否变化」决定 focus/render，可见场景下均会变化，与旧行为一致。
+- **唯一行为收紧**：工具栏判断字段前缀改用 `splitToken`，`k$^:vue` 之类非法锚点顺序不再被当作前缀（旧 `FIELD_OP_RE` 会）。由 `search-text.test.ts` 与 `query.test.ts` 固定。
+- **未触碰**：`sw.js` / 构建脚本 / 缓存管线 / 导入 / 最近搜索 / 资源空间 / 更新。
+
+## 验证记录（2026-11-24）
+
+| 检查 | 结果 |
+| --- | --- |
+| `npm run check` | tsc 无错 + 101 个测试全绿（query 45、search-text 42，其余不变） |
+| `node scripts/verify-quick-input.mjs` | ALL PASS（29 项；按钮集合/改写/锚点语义/390px 两行布局均不变） |

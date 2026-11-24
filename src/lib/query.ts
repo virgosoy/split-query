@@ -31,30 +31,49 @@ interface CompiledTerm {
 }
 
 /**
+ * 一个空格分隔 token 的共享拆解结果。工具栏改写与查询解析共用这套 grammar。
+ * - `prefix` 保留原文（含大小写、半/全角冒号），无字段算子时为 ''。
+ * - `value` 保留原文大小写，可为空（如 `k:`）。
+ */
+export interface SplitToken {
+  negate: boolean;
+  prefix: string;
+  value: string;
+}
+
+const FIELD_PREFIX_RE = /^(k|h)(\^)?(\$)?[:：]/i;
+
+/** 拆出取反前缀、字段算子前缀与值；不校验合法性（`k$^:` 之类不视为前缀）。 */
+export function splitToken(token: string): SplitToken {
+  const negate = token.startsWith('!');
+  const rest = negate ? token.slice(1) : token;
+  const match = FIELD_PREFIX_RE.exec(rest);
+  return {
+    negate,
+    prefix: match ? match[0] : '',
+    value: match ? rest.slice(match[0].length) : rest,
+  };
+}
+
+/**
  * 解析一个空格分隔的条件 token 为编译后条件。
  * 解析失败（如算子后无值）返回 null，调用方应跳过该 token。
  */
 function parseTerm(token: string): CompiledTerm | null {
-  let negate = false;
-  let rest = token;
-  if (token.startsWith('!')) {
-    negate = true;
-    rest = token.slice(1);
-  }
+  const { negate, prefix, value } = splitToken(token);
+  if (value === '') return null;
 
-  const op = /^(k|h)(\^)?(\$)?[:：]/i.exec(rest);
   let field: Field = 'full';
   let mode: Mode = 'contains';
-  let value = rest;
-  if (op) {
-    field = op[1].toLowerCase() === 'k' ? 'keyword' : 'head';
-    if (op[2] && op[3]) mode = 'exact';
-    else if (op[2]) mode = 'starts';
-    else if (op[3]) mode = 'ends';
-    value = rest.slice(op[0].length);
+  if (prefix !== '') {
+    field = prefix[0].toLowerCase() === 'k' ? 'keyword' : 'head';
+    const starts = prefix.includes('^');
+    const ends = prefix.includes('$');
+    if (starts && ends) mode = 'exact';
+    else if (starts) mode = 'starts';
+    else if (ends) mode = 'ends';
   }
 
-  if (value === '') return null;
   return { negate, field, mode, value: lower(value) };
 }
 

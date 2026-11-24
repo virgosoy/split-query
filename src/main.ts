@@ -1,5 +1,6 @@
 import './styles.css';
 import { buildQuery, buildVocabulary, type VocabEntry } from './lib/query';
+import { completions, editSearchText, FIELD_OPS, type FieldOp } from './lib/search-text';
 import { isHttpUrl, parseFile, type Item } from './lib/parse';
 import { shuffle } from './lib/order';
 import { loadItems, saveItems } from './lib/storage';
@@ -9,18 +10,6 @@ import { initUpdates } from './update';
 
 const app = document.querySelector<HTMLDivElement>('#app');
 if (!app) throw new Error('#app not found');
-
-/** 工具栏字段算子按钮；数组顺序即展示顺序。 */
-const FIELD_OPS = [
-  { op: 'k:', label: '关键词' },
-  { op: 'k^:', label: '关键词^' },
-  { op: 'k$:', label: '关键词$' },
-  { op: 'k^$:', label: '关键词^$' },
-  { op: 'h:', label: '首词' },
-  { op: 'h^:', label: '首词^' },
-  { op: 'h$:', label: '首词$' },
-  { op: 'h^$:', label: '首词^$' },
-] as const;
 
 const fieldOpButtons = FIELD_OPS.map(
   ({ op, label }) => `<button class="op" data-op="${op}" type="button">${label}</button>`,
@@ -170,55 +159,18 @@ function rollRandomOrder(): void {
 
 // ---------- 搜索框工具 ----------
 
-const FIELD_OP_RE = /^(k|h)[\^$]*[:：]/i;
-const hasFieldOp = (token: string): boolean => FIELD_OP_RE.test(token);
-
-/** 拆出 token 的取反前缀与本体。 */
-function stripNeg(token: string): { neg: string; core: string } {
-  return token.startsWith('!') ? { neg: '!', core: token.slice(1) } : { neg: '', core: token };
-}
-
-/**
- * 读取当前（最后）行并交给回调改写；回调返回新 token 数组则写回，否则不动。
- * 返回是否发生了写回。
- */
-function editCurrentLine(fn: (tokens: string[]) => string[] | undefined): boolean {
-  const lines = search.value.split('\n');
-  const tokens = lines[lines.length - 1].trim().split(/\s+/).filter(Boolean);
-  const next = fn(tokens);
-  if (!next) return false;
-  lines[lines.length - 1] = next.join(' ');
-  search.value = lines.join('\n');
-  return true;
-}
-
 /** 对当前行末尾 token 取反 / 取消取反。 */
 function toggleExclude(): void {
-  const changed = editCurrentLine((tokens) => {
-    if (tokens.length === 0) return;
-    const i = tokens.length - 1;
-    tokens[i] = tokens[i].startsWith('!') ? tokens[i].slice(1) : '!' + tokens[i];
-    return tokens;
-  });
-  if (changed) {
-    search.focus();
-    renderFiltered();
-  }
+  const next = editSearchText(search.value, { kind: 'toggleExclude' });
+  if (next === search.value) return;
+  search.value = next;
+  search.focus();
+  renderFiltered();
 }
 
 /** 字段算子按钮：有末词则给末词加/替换前缀；无词（空框或刚换行）则追加前缀后打字。 */
-function applyFieldOp(op: string): void {
-  const changed = editCurrentLine((tokens) => {
-    if (tokens.length === 0) return;
-    const i = tokens.length - 1;
-    const { neg, core } = stripNeg(tokens[i]);
-    tokens[i] = neg + (hasFieldOp(core) ? core.replace(FIELD_OP_RE, op) : op + core);
-    return tokens;
-  });
-  if (!changed) {
-    const v = search.value;
-    search.value = v === '' || v.endsWith('\n') ? v + op : v + ' ' + op;
-  }
+function applyFieldOp(op: FieldOp): void {
+  search.value = editSearchText(search.value, { kind: 'fieldOp', op });
   search.focus();
   renderFiltered();
 }
@@ -227,36 +179,26 @@ function applyFieldOp(op: string): void {
 
 function updateSuggestions(): void {
   suggest.textContent = '';
-  const lines = search.value.split('\n');
-  const tokens = lines[lines.length - 1].trim().split(/\s+/).filter(Boolean);
-  const last = tokens.length > 0 ? tokens[tokens.length - 1] : '';
-  if (last === '' || last.startsWith('!') || hasFieldOp(last)) {
-    suggest.hidden = true;
-    return;
-  }
-  const key = last.toLowerCase();
-  const hits = vocab
-    .filter((e) => e.word.toLowerCase().startsWith(key) && e.word.toLowerCase() !== key)
-    .slice(0, 8);
+  const hits = completions(
+    search.value,
+    vocab.map((e) => e.word),
+  );
   if (hits.length === 0) {
     suggest.hidden = true;
     return;
   }
-  for (const hit of hits) {
+  for (const word of hits) {
     const chip = document.createElement('button');
     chip.className = 'chip';
     chip.type = 'button';
-    chip.textContent = hit.word;
+    chip.textContent = word;
     chip.addEventListener('click', () => {
-      if (editCurrentLine((toks) => {
-        if (toks.length === 0) return;
-        toks[toks.length - 1] = hit.word;
-        return toks;
-      })) {
-        suggest.hidden = true;
-        search.focus();
-        renderFiltered();
-      }
+      const next = editSearchText(search.value, { kind: 'complete', word });
+      if (next === search.value) return;
+      search.value = next;
+      suggest.hidden = true;
+      search.focus();
+      renderFiltered();
     });
     suggest.appendChild(chip);
   }
@@ -427,7 +369,7 @@ rerollBtn.addEventListener('click', () => {
 });
 
 for (const btn of app.querySelectorAll<HTMLButtonElement>('.op[data-op]')) {
-  btn.addEventListener('click', () => applyFieldOp(btn.dataset.op ?? ''));
+  btn.addEventListener('click', () => applyFieldOp(btn.dataset.op as FieldOp));
 }
 app.querySelector<HTMLButtonElement>('#btn-exclude')!.addEventListener('click', toggleExclude);
 

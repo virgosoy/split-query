@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildQuery, buildVocabulary } from './query';
+import { buildQuery, buildVocabulary, splitToken } from './query';
 import type { Item } from './parse';
 
 const items: Item[] = [
@@ -85,5 +85,26 @@ describe('buildVocabulary — 补全词库', () => {
 
   it('空条目集返回空词库', () => {
     expect(buildVocabulary([])).toEqual([]);
+  });
+});
+
+describe('splitToken — 共享 grammar', () => {
+  // 矩阵：[输入, 预期（negate/prefix/value；prefix 与 value 保留原文）]
+  const matrix: Array<[string, { negate: boolean; prefix: string; value: string }]> = [
+    ['vue', { negate: false, prefix: '', value: 'vue' }],
+    ['!vue', { negate: true, prefix: '', value: 'vue' }],
+    ['k:vue', { negate: false, prefix: 'k:', value: 'vue' }],
+    ['k^:vue', { negate: false, prefix: 'k^:', value: 'vue' }],
+    ['h$:vue', { negate: false, prefix: 'h$:', value: 'vue' }],
+    ['k^$:vue', { negate: false, prefix: 'k^$:', value: 'vue' }],
+    ['!k:vue', { negate: true, prefix: 'k:', value: 'vue' }],
+    ['k：vue', { negate: false, prefix: 'k：', value: 'vue' }], // 全角冒号，prefix 保留全角原文
+    ['K^：Vue', { negate: false, prefix: 'K^：', value: 'Vue' }], // 原文大小写保留
+    ['k:', { negate: false, prefix: 'k:', value: '' }], // 算子后无值
+    ['k$^:vue', { negate: false, prefix: '', value: 'k$^:vue' }], // 非法锚点顺序不作前缀
+  ];
+
+  it.each(matrix)('%j → %j', (token, expected) => {
+    expect(splitToken(token)).toEqual(expected);
   });
 });
