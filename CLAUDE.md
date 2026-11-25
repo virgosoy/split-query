@@ -19,3 +19,5 @@ Issues are tracked as local markdown files under `.scratch/<feature>/`. See `doc
 ### Domain docs
 
 Single-context: one `GLOSSARY.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+
+@.claude/preferences.md
