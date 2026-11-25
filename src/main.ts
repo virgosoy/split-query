@@ -2,6 +2,13 @@ import './styles.css';
 import { buildQuery, buildVocabulary, type VocabEntry } from './lib/query';
 import { completions, editSearchText, FIELD_OPS, type FieldOp } from './lib/search-text';
 import { isHttpUrl, parseFile, type Item } from './lib/parse';
+import {
+  alternativesFor,
+  buildAddressPool,
+  isAddressItem,
+  type AddressPool,
+  type AlternativeLink,
+} from './lib/address';
 import { shuffle } from './lib/order';
 import { loadItems, saveItems } from './lib/storage';
 import { formatBytes } from './lib/format';
@@ -43,6 +50,11 @@ app.innerHTML = `
     </select>
     <button id="reroll" class="chip sort-reroll" type="button" hidden>换一批</button>
   </div>
+  <div id="addressbar" class="addressbar" hidden>
+    <span class="address-label">地址前缀替换</span>
+    <button id="address-toggle" class="switch" type="button" role="switch" aria-checked="true"
+      aria-label="地址前缀替换"></button>
+  </div>
   <main id="results" class="results"></main>
   <div id="usage" class="usage" hidden>
     <div class="usage-panel" role="dialog" aria-modal="true" aria-labelledby="usage-title">
@@ -52,7 +64,7 @@ app.innerHTML = `
         <div class="usage-row"><dt>应用资源</dt><dd id="usage-app"></dd></div>
         <div id="usage-total-row" class="usage-row usage-row-total" hidden><dt>合计</dt><dd id="usage-total"></dd></div>
       </dl>
-      <p class="usage-note">只统计本站点脚本可写的存储，不含浏览器 HTTP 缓存与系统快照，因此不等于手机剩余空间的变化量。文件是唯一真源：重新导入整体替换、不累积。</p>
+      <p class="usage-note">只统计「条目数据」「应用资源」两个桶，不含地址前缀替换开关的偏好（localStorage）、浏览器 HTTP 缓存与系统快照，因此不等于手机剩余空间的变化量。文件是唯一真源：重新导入整体替换、不累积。</p>
       <button id="usage-close" class="btn" type="button">关闭</button>
     </div>
   </div>
@@ -81,6 +93,8 @@ const recentEl = app.querySelector<HTMLDivElement>('#recent')!;
 const sortbarEl = app.querySelector<HTMLDivElement>('#sortbar')!;
 const sortSelect = app.querySelector<HTMLSelectElement>('#sort-select')!;
 const rerollBtn = app.querySelector<HTMLButtonElement>('#reroll')!;
+const addressbarEl = app.querySelector<HTMLDivElement>('#addressbar')!;
+const addressToggle = app.querySelector<HTMLButtonElement>('#address-toggle')!;
 const usageBtn = app.querySelector<HTMLButtonElement>('#usage-btn')!;
 const usageEl = app.querySelector<HTMLDivElement>('#usage')!;
 const usageItemsEl = app.querySelector<HTMLElement>('#usage-items')!;
@@ -95,6 +109,33 @@ type SortMode = 'file' | 'random';
 let sortMode: SortMode = 'file';
 /** 随机模式下的全排列；搜索只取它的子序列，故输入时不重滚。 */
 let randomOrder: Item[] = [];
+
+/** 前缀池：导入时构建；基址 → 同条目内其他基址。 */
+let addressPool: AddressPool = new Map();
+/** 是否有任何链接能用上替代：决定开关行是否出现。 */
+let addressAvailable = false;
+
+const ADDRESS_PREF_KEY = 'split-query:address-alternatives';
+
+/** 开关状态是持久偏好；没有该键视为开。localStorage 读取是同步的，启动无闪烁。 */
+function loadAddressPref(): boolean {
+  try {
+    return localStorage.getItem(ADDRESS_PREF_KEY) !== 'off';
+  } catch {
+    return true; // 隐私模式等读不到时按默认开
+  }
+}
+
+function saveAddressPref(on: boolean): void {
+  try {
+    if (on) localStorage.removeItem(ADDRESS_PREF_KEY);
+    else localStorage.setItem(ADDRESS_PREF_KEY, 'off');
+  } catch {
+    // 存不下时只影响下次启动，本次界面状态不变
+  }
+}
+
+let addressAlternativesOn = loadAddressPref();
 
 // ---------- 渲染 ----------
 
@@ -128,6 +169,10 @@ function render(list: Item[]): void {
         link.rel = 'noopener noreferrer';
         link.textContent = line;
         card.appendChild(link);
+        if (addressAlternativesOn && !isAddressItem(item)) {
+          const alternatives = alternativesFor(line, addressPool);
+          if (alternatives.length > 0) card.appendChild(renderAlternatives(alternatives));
+        }
       } else {
         const p = document.createElement('p');
         p.className = 'item-note';
@@ -139,10 +184,56 @@ function render(list: Item[]): void {
   }
 }
 
+/**
+ * 一条链接的替代前缀行：最多 2 个 chip，其余收成「还有 N 个」。
+ * 展开是原地插入、不可收起；任何重渲染都会重建 DOM，自然回到折叠态。
+ */
+function renderAlternatives(alternatives: readonly AlternativeLink[]): HTMLElement {
+  const row = document.createElement('div');
+  row.className = 'alt-row';
+
+  const label = document.createElement('span');
+  label.className = 'alt-label';
+  label.textContent = '换前缀';
+  row.appendChild(label);
+
+  for (const alt of alternatives.slice(0, 2)) row.appendChild(createAltChip(alt));
+
+  const rest = alternatives.slice(2);
+  if (rest.length > 0) {
+    const more = document.createElement('button');
+    more.className = 'chip alt-more';
+    more.type = 'button';
+    more.setAttribute('aria-expanded', 'false');
+    more.textContent = `还有 ${rest.length} 个`;
+    more.addEventListener('click', () => {
+      const chips = rest.map(createAltChip);
+      for (const chip of chips) row.insertBefore(chip, more);
+      more.remove();
+      chips[0].focus();
+    });
+    row.appendChild(more);
+  }
+  return row;
+}
+
+function createAltChip(alt: AlternativeLink): HTMLAnchorElement {
+  const chip = document.createElement('a');
+  chip.className = 'chip alt-chip';
+  chip.href = alt.href;
+  chip.target = '_blank';
+  chip.rel = 'noopener noreferrer';
+  chip.textContent = alt.prefix;
+  chip.title = `用 ${alt.href} 打开`;
+  chip.setAttribute('aria-label', `用 ${alt.prefix} 前缀打开 ${alt.href}`);
+  return chip;
+}
+
 function renderFiltered(): void {
   const base = sortMode === 'random' ? randomOrder : items;
   render(base.filter(buildQuery(search.value)));
   syncSortbar();
+  syncAddressBar();
   updateSuggestions();
 }
 
@@ -150,6 +241,12 @@ function renderFiltered(): void {
 function syncSortbar(): void {
   sortbarEl.hidden = items.length === 0;
   rerollBtn.hidden = sortMode !== 'random';
+}
+
+/** 有可用替代时显示开关行；关闭后仍保留该行，以便再打开。 */
+function syncAddressBar(): void {
+  addressbarEl.hidden = !addressAvailable;
+  addressToggle.setAttribute('aria-checked', String(addressAlternativesOn));
 }
 
 /** 按当前条目重滚一次全排列（只在随机模式下调用）。 */
@@ -247,6 +344,15 @@ function applyItems(source: Item[]): void {
   items = source;
   vocab = buildVocabulary(items);
   countEl.textContent = `${items.length} 条目`;
+  addressPool = buildAddressPool(items);
+  // 开关行只在全部条目里至少有一条非地址条目的链接能拿到替代时出现
+  addressAvailable = items.some(
+    (item) =>
+      !isAddressItem(item) &&
+      item.otherLines.some(
+        (line) => isHttpUrl(line) && alternativesFor(line, addressPool).length > 0,
+      ),
+  );
   // 排序选择是视图状态：重新导入不改变它；随机模式为新数据滚新排列
   if (sortMode === 'random') rollRandomOrder();
   renderFiltered();
@@ -365,6 +471,12 @@ sortSelect.addEventListener('change', () => {
 rerollBtn.addEventListener('click', () => {
   if (sortMode !== 'random') return;
   rollRandomOrder();
+  renderFiltered();
+});
+
+addressToggle.addEventListener('click', () => {
+  addressAlternativesOn = !addressAlternativesOn;
+  saveAddressPref(addressAlternativesOn);
   renderFiltered();
 });
 
