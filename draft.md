@@ -26,7 +26,7 @@
 
 ## 由「地址前缀替换」这一轮引出的后续（2026-11-25 记录）
 
-- [ ] feat: 资源空间面板统计偏好数据（`localStorage`）。地址前缀替换开关按 P2 存 `localStorage`，而面板当前只统计条目数据（IndexedDB key `all`）与应用资源（Cache Storage），合计不含这份偏好；票 17 实现时先修正 `spec.md:88` 与 `main.ts` 面板注释的口径，本项负责把统计补上
+- [-] feat: 资源空间面板统计偏好数据（`localStorage`）。**2026-11-25 决定不做**：这份偏好最多 35 B（key 32 B + 值 `off` 3 B），默认开时键不存在、即 0 B；为它新增第三个桶要同时改 spec 的桶数契约、`GLOSSARY` 的「三个数」、面板说明与验收面，收益只有几 B，不划算。面板继续不统计它（`spec.md` 的两处口径已改为「不统计」）
 
 ## 由「资源空间」这一轮引出的后续功能（v1 不做，2026-11-20 记录）
 
@@ -34,6 +34,7 @@
 - [ ] feat: 导出 / 备份本地副本（把 IndexedDB 里的条目导回文本文件，与「文件是真源」互补）
 - [ ] feat: 面板里给「查看 / 清理系统站点数据」的引导。需要先核实 iOS 16.1 上真实可达的路径，不能凭空写文案
 - [ ] fix: 最近搜索只在内存里（`src/main.ts` 的 `recent` 数组未落盘），刷新即失 —— 不是本轮范围，读代码时发现的真实缺口
+- [ ] fix（低优先，未开票）: 「应用资源」会把同 origin 兄弟站的缓存算进来。Cache Storage 按 origin 共享——在同一个浏览器数据存储里访问过 `virgosoy.github.io/git-md-pwa` / `hapi-ios` 后，它们的 Workbox 缓存会出现在 split-query 的 `caches.keys()` 里（2026-11-25 合成实测外来 13,929,184 B，而本应用仅 34,931 B；本机实际 34.1 KB 不复现）。修法：只统计 `split-query-` 前缀的 cache；但需先核实 iOS 主屏 App 与 Safari 是否共享数据存储，并考虑票 08「不硬编码缓存名」的决定
 - [ ] feat: 系统配额 / 已用（`navigator.storage.estimate()` 的 `usage` / `quota`）—— iOS 16.1 上此 API 不存在（落在 Safari 17 / iOS 17：MDN BCD `api/StorageManager.json` `version_added: "17"`，WebKit 的 Safari 17 beta 公告列为 "newly supported"）。将来升到 iOS 17 后可直接读出「已用 / 上限」，届时给面板加一行；v1 不写这段探测分支（在目标设备上永远不渲染 = 无法人工验证 = 负债）
 - [-] fix: 预热 URL 去重（同一 URL 在 warmup 列表出现两次——favicon 与 manifest 都指向 `icon-192.png`；per-URL `cache.add` 会重复请求，旧 `cache.addAll` 会因 `InvalidStateError: duplicate requests` 整批失败）。2026-11-21 retro 发现；2026-11-22 票 12 删除 warmup 后本项作废
 
@@ -44,3 +45,7 @@
 ## 由「关键词锚点快捷按钮」这一轮引出的后续（2026-11-23 记录）
 
 - [ ] feat: 自动补全支持字段前缀——在 `k:` / `h:` / `k^:` 等算子之后仍给出候选词，点选只替换值部分（如 `k^:v` 点选得到 `k^:vue`）。票 15 未做：这是所有算子按钮共有的既有行为，改动会扩大验收面（前缀解析、裸词、`!`、全角冒号），值得单独一票。
+
+## 新想法（2026-11-25 记录）
+
+- [ ] feat: 排序支持「文件倒序」排列
