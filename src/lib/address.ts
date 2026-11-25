@@ -4,7 +4,7 @@
  * 领域概念见 GLOSSARY.md：
  * 地址条目 address item、替代前缀 alternative prefix。
  */
-import { isHttpUrl, type Item } from './parse';
+import { splitUrlLine, type Item } from './parse';
 
 /** 地址条目的首词（严格相等）。 */
 const ADDRESS_HEAD = '地址';
@@ -35,13 +35,15 @@ export function isAddressItem(item: Item): boolean {
 }
 
 /**
- * 把一条 http(s) URL 拆成规范化基址键、原样前缀与余下部分。
+ * 把一条 http(s) URL 行拆成规范化基址键、原样前缀与余下部分。
+ * 行内空白之后的描述被忽略（见 parse seam 的 `splitUrlLine`）；
  * 余下部分去掉基址后的第一个 '/'：`/a?b` → `a?b`，`?b` → `?b`，空 → 空。
  * 非 http(s) 或没有 authority 时返回 null。
  */
-function splitUrl(url: string): { prefix: string; key: PrefixKey; suffix: string } | null {
-  if (!isHttpUrl(url)) return null;
-  const match = /^([A-Za-z][A-Za-z0-9+.-]*):\/\/([^/?#]*)(.*)$/.exec(url);
+function splitUrl(line: string): { prefix: string; key: PrefixKey; suffix: string } | null {
+  const urlLine = splitUrlLine(line);
+  if (urlLine === null) return null;
+  const match = /^([A-Za-z][A-Za-z0-9+.-]*):\/\/([^/?#]*)(.*)$/.exec(urlLine.url);
   if (match === null) return null;
   const scheme = match[1];
   const authority = match[2];

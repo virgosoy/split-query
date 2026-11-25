@@ -1,7 +1,7 @@
 import './styles.css';
 import { buildQuery, buildVocabulary, type VocabEntry } from './lib/query';
 import { completions, editSearchText, FIELD_OPS, type FieldOp } from './lib/search-text';
-import { isHttpUrl, parseFile, type Item } from './lib/parse';
+import { parseFile, splitUrlLine, type Item } from './lib/parse';
 import {
   alternativesFor,
   buildAddressPool,
@@ -161,16 +161,29 @@ function render(list: Item[]): void {
     card.appendChild(keyword);
 
     for (const line of item.otherLines) {
-      if (isHttpUrl(line)) {
+      const urlLine = splitUrlLine(line);
+      if (urlLine !== null) {
+        const row = document.createElement('div');
+        row.className = 'link-row';
+
         const link = document.createElement('a');
         link.className = 'item-link';
-        link.href = line;
+        link.href = urlLine.url;
         link.target = '_blank';
         link.rel = 'noopener noreferrer';
-        link.textContent = line;
-        card.appendChild(link);
+        link.textContent = urlLine.url;
+        row.appendChild(link);
+
+        if (urlLine.note !== '') {
+          const note = document.createElement('span');
+          note.className = 'link-note';
+          note.textContent = urlLine.note;
+          row.appendChild(note);
+        }
+
+        card.appendChild(row);
         if (addressAlternativesOn && !isAddressItem(item)) {
-          const alternatives = alternativesFor(line, addressPool);
+          const alternatives = alternativesFor(urlLine.url, addressPool);
           if (alternatives.length > 0) card.appendChild(renderAlternatives(alternatives));
         }
       } else {
@@ -349,9 +362,10 @@ function applyItems(source: Item[]): void {
   addressAvailable = items.some(
     (item) =>
       !isAddressItem(item) &&
-      item.otherLines.some(
-        (line) => isHttpUrl(line) && alternativesFor(line, addressPool).length > 0,
-      ),
+      item.otherLines.some((line) => {
+        const urlLine = splitUrlLine(line);
+        return urlLine !== null && alternativesFor(urlLine.url, addressPool).length > 0;
+      }),
   );
   // 排序选择是视图状态：重新导入不改变它；随机模式为新数据滚新排列
   if (sortMode === 'random') rollRandomOrder();

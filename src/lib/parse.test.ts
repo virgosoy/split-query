@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseFile, type Item } from './parse';
+import { parseFile, splitUrlLine, type Item } from './parse';
 
 const fullItem: Item = {
   keywordLine: '1+ 搜索 国内',
@@ -39,5 +39,44 @@ describe('parseFile', () => {
   it('空文件或全空行文件返回空数组', () => {
     expect(parseFile('')).toEqual([]);
     expect(parseFile('\n  \n\n')).toEqual([]);
+  });
+
+  it('URL 行带描述时 otherLines 仍保留整行', () => {
+    const items = parseFile('地址\nhttp://a.com 主站');
+    expect(items[0].otherLines).toEqual(['http://a.com 主站']);
+  });
+});
+
+describe('splitUrlLine', () => {
+  it('没有描述时 note 为空', () => {
+    expect(splitUrlLine('http://a.com/path?x=1#h')).toEqual({
+      url: 'http://a.com/path?x=1#h',
+      note: '',
+    });
+  });
+
+  it('第一个空白串之后的都算描述，内部空白保留', () => {
+    expect(splitUrlLine('https://a.com/x 主站  备用')).toEqual({
+      url: 'https://a.com/x',
+      note: '主站  备用',
+    });
+  });
+
+  it('支持 Tab 与全角空格', () => {
+    expect(splitUrlLine('http://a.com\t说明')).toEqual({ url: 'http://a.com', note: '说明' });
+    expect(splitUrlLine('http://a.com　说明')).toEqual({
+      url: 'http://a.com',
+      note: '说明',
+    });
+  });
+
+  it('scheme 大小写保留，行尾空白与空描述', () => {
+    expect(splitUrlLine('HTTP://A.COM 说明')).toEqual({ url: 'HTTP://A.COM', note: '说明' });
+    expect(splitUrlLine('http://a.com   ')).toEqual({ url: 'http://a.com', note: '' });
+  });
+
+  it('非 http(s) 行返回 null', () => {
+    expect(splitUrlLine('说明文字 http://a.com')).toBeNull();
+    expect(splitUrlLine('ftp://a.com 说明')).toBeNull();
   });
 });

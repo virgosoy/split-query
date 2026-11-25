@@ -163,4 +163,13 @@ describe('alternativesFor', () => {
       'https://a.example',
     ]);
   });
+
+  it('地址行与链接行带描述时只取 URL，描述不进入替换结果', () => {
+    const described = buildAddressPool([
+      addressItem('http://a1.example/ 主站', 'http://a2.example/ 备用站'),
+    ]);
+    expect(alternativesFor('http://a1.example/path 主站说明', described)).toEqual([
+      { prefix: 'http://a2.example', href: 'http://a2.example/path' },
+    ]);
+  });
 });

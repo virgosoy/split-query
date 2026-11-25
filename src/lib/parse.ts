@@ -18,6 +18,25 @@ export function isHttpUrl(line: string): boolean {
   return /^https?:\/\//i.test(line);
 }
 
+/** 一条 URL 行拆出的 URL 与描述。 */
+export interface UrlLine {
+  /** 第一个空白前的 URL 部分（保留原大小写）。 */
+  url: string;
+  /** 空白之后的描述；没有时为 ''（已去首尾空白，内部空白保留）。 */
+  note: string;
+}
+
+/**
+ * 拆 URL 行：URL = 第一个空白串之前，描述 = 其后。
+ * 非 http(s) 行返回 null；调用方传入的行已去首尾空白（与 isHttpUrl 一致）。
+ */
+export function splitUrlLine(line: string): UrlLine | null {
+  if (!isHttpUrl(line)) return null;
+  const match = /^(\S+)(?:\s+(.*))?$/.exec(line);
+  if (match === null) return null;
+  return { url: match[1], note: (match[2] ?? '').trim() };
+}
+
 /** 文本 → 条目[]。按空行切分，忽略文件首尾与多余空行；行内容去首尾空白。 */
 export function parseFile(text: string): Item[] {
   const blocks: string[][] = [];

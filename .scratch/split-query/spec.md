@@ -208,3 +208,23 @@
 - 不扩大地址条目的判定（不改首词规则、不做别名）。
 - 不自动探测基址可达性；替代项不排序（按文件顺序）。
 - 资源空间面板统计 `localStorage` 偏好：另开票，记在 `draft.md`。
+
+## v1.1 追加（2026-11-25）：URL 行描述
+
+### User Story（追加）
+
+25. 用户想在 URL 行里写一句说明，并让它不被当成 URL 的一部分，以便链接仍能正常打开、地址条目仍能参与换基址。
+
+### Implementation Decisions（追加）
+
+- **切分规则**：只有以 `http(s)://` 开头的其他行参与；URL = 第一个空白串之前，描述 = 其后并去掉首尾空白；无空白则描述为空；内部空白保留。空白口径为 JS `\s`（半角空格、Tab、全角空格、NBSP）。
+- **数据形状**：`parseFile` 与 `otherLines` 不变，IndexedDB 无迁移；parse seam 新增纯函数 `splitUrlLine(line): { url, note } | null`（非 http(s) → null，无描述时 `note` 为 `''`），`main.ts` 渲染与 `address.ts` 取基址共用。
+- **渲染**：URL 行统一为 `.link-row`（链接 + 可选 `.link-note`）；链接文字与 `href` 都只含 URL；描述为静音 13px、可折行；「换前缀」chips 行接在 `.link-row` 之后。
+- **搜索**：描述仍是条目文本的一部分，参与全文搜索，行为不变。
+- **换基址**：地址条目的 URL 行同样切分；基址只取 URL 部分，描述不影响前缀匹配，地址条目自己的描述照常显示。
+- **测试**：扩展 `parse.test.ts` 与 `address.test.ts`；不新增 seam，`CLAUDE.md` 的六条清单不变。
+
+### Out of Scope（追加）
+
+- 不支持未编码的空格 URL（URL 内含空格必须写成 `%20`）。
+- 不改关键词行的分词规则；不把描述提升为独立字段，也不参与排序或换基址。

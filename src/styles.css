@@ -308,13 +308,26 @@ body {
   word-break: break-word;
 }
 
+.link-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 8px;
+  padding: 2px 0;
+}
+
 .item-link {
-  display: block;
+  min-width: 0;
   color: var(--link);
   text-decoration: none;
   font-size: 13px;
-  padding: 2px 0;
   word-break: break-all;
+}
+
+.link-note {
+  color: var(--muted);
+  font-size: 13px;
+  overflow-wrap: anywhere;
 }
 
 .item-link:active {

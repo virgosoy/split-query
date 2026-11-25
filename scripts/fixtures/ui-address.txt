@@ -1,19 +1,19 @@
 地址
 内网
-http://intranet.local
-https://intranet.example.com:8443
+http://intranet.local 内网门户
+https://intranet.example.com:8443 内网门户（HTTPS）
 
 地址
 公网
-https://prod.example.com
-https://prod-mirror.example.com
-https://prod-backup.example.com
-https://prod-alt.example.com
+https://prod.example.com 生产主站
+https://prod-mirror.example.com 镜像站
+https://prod-backup.example.com 备用站
+https://prod-alt.example.com 第三备用
 
 内网服务
-https://intranet.example.com:8443/app
-http://intranet.local/tools?tab=1
-https://intranet.example.com/app
-https://prod.example.com/item/1
-HTTPS://PROD.EXAMPLE.COM/case
-https://unmatched.example.org/x
+https://intranet.example.com:8443/app 内网门户应用
+http://intranet.local/tools?tab=1 内网工具
+https://intranet.example.com/app 无端口（不应命中）
+https://prod.example.com/item/1 生产条目
+HTTPS://PROD.EXAMPLE.COM/case 大写主机
+https://unmatched.example.org/x 未匹配
