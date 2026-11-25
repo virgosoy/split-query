@@ -1,9 +1,10 @@
 /**
- * order seam：条目排序的纯函数（v1.1 按需随机排序）。
+ * order seam：条目排序的纯函数（v1.1 按需随机排序 + 文件倒序）。
  *
  * shuffle 使用 Fisher–Yates，随机源注入以便测试；不修改入参。
  * 随机排列的消费方式：对全部条目滚一次，搜索只取该排列的子序列，
  * 因此输入过程中结果先后保持稳定（见 spec 的「v1.1 追加」）。
+ * reverse 只反转条目顺序，条目内部结构不在此处理。
  */
 
 /** 随机源：返回 [0, 1) 的均匀随机数。 */
@@ -20,4 +21,12 @@ export function shuffle<T>(items: readonly T[], random: RandomSource = Math.rand
     [result[i], result[j]] = [result[j], result[i]];
   }
   return result;
+}
+
+/**
+ * 返回 items 的倒序副本（新数组，入参不变）。
+ * 用于「文件倒序」：只反转条目整体顺序，不触碰条目内部。
+ */
+export function reverse<T>(items: readonly T[]): T[] {
+  return items.slice().reverse();
 }

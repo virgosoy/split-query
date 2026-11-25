@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { shuffle } from './order';
+import { reverse, shuffle } from './order';
 
 /** 固定种子的伪随机源（LCG），仅用于断言性质，不参与期望排列的推导。 */
 function seededRandom(seed: number): () => number {
@@ -45,5 +45,26 @@ describe('shuffle', () => {
     expect(shuffle([1, 2, 3, 4, 5], seededRandom(7))).toEqual(
       shuffle([1, 2, 3, 4, 5], seededRandom(7)),
     );
+  });
+});
+
+describe('reverse', () => {
+  it('条目整体倒序（手算示例）', () => {
+    expect(reverse(['a', 'b', 'c'])).toEqual(['c', 'b', 'a']);
+  });
+
+  it('空数组 → 空数组', () => {
+    expect(reverse([])).toEqual([]);
+  });
+
+  it('单元素 → 原样', () => {
+    expect(reverse(['a'])).toEqual(['a']);
+  });
+
+  it('不修改入参，且返回新数组', () => {
+    const input = Object.freeze(['a', 'b', 'c']);
+    const output = reverse(input);
+    expect(input).toEqual(['a', 'b', 'c']);
+    expect(output).not.toBe(input);
   });
 });

@@ -9,7 +9,7 @@ import {
   type AddressPool,
   type AlternativeLink,
 } from './lib/address';
-import { shuffle } from './lib/order';
+import { reverse, shuffle } from './lib/order';
 import { loadItems, saveItems } from './lib/storage';
 import { formatBytes } from './lib/format';
 import { APP_VERSION } from './version';
@@ -46,6 +46,7 @@ app.innerHTML = `
     <label class="sort-label" for="sort-select">排序</label>
     <select id="sort-select" class="sort-select">
       <option value="file">文件顺序</option>
+      <option value="file-reverse">文件倒序</option>
       <option value="random">随机</option>
     </select>
     <button id="reroll" class="chip sort-reroll" type="button" hidden>换一批</button>
@@ -105,7 +106,7 @@ const usageTotalEl = app.querySelector<HTMLElement>('#usage-total')!;
 let items: Item[] = [];
 let vocab: VocabEntry[] = [];
 
-type SortMode = 'file' | 'random';
+type SortMode = 'file' | 'file-reverse' | 'random';
 let sortMode: SortMode = 'file';
 /** 随机模式下的全排列；搜索只取它的子序列，故输入时不重滚。 */
 let randomOrder: Item[] = [];
@@ -243,7 +244,8 @@ function createAltChip(alt: AlternativeLink): HTMLAnchorElement {
 }
 
 function renderFiltered(): void {
-  const base = sortMode === 'random' ? randomOrder : items;
+  const base =
+    sortMode === 'random' ? randomOrder : sortMode === 'file-reverse' ? reverse(items) : items;
   render(base.filter(buildQuery(search.value)));
   syncSortbar();
   syncAddressBar();
@@ -253,6 +255,8 @@ function renderFiltered(): void {
 /** 排序行只在有条目时出现；「换一批」只在随机模式下出现。 */
 function syncSortbar(): void {
   sortbarEl.hidden = items.length === 0;
+  // 显式同步控件值：浏览器刷新时可能恢复表单状态，避免下拉显示与视图状态不一致。
+  sortSelect.value = sortMode;
   rerollBtn.hidden = sortMode !== 'random';
 }
 
@@ -478,7 +482,8 @@ search.addEventListener('input', renderFiltered);
 search.addEventListener('change', () => rememberRecent(search.value));
 
 sortSelect.addEventListener('change', () => {
-  sortMode = sortSelect.value === 'random' ? 'random' : 'file';
+  const value = sortSelect.value;
+  sortMode = value === 'random' ? 'random' : value === 'file-reverse' ? 'file-reverse' : 'file';
   if (sortMode === 'random') rollRandomOrder();
   renderFiltered();
 });
