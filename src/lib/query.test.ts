@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildQuery, buildVocabulary, splitToken } from './query';
+import { buildHeadVocabulary, buildQuery, buildVocabulary, splitToken } from './query';
 import type { Item } from './parse';
 
 const items: Item[] = [
@@ -85,6 +85,36 @@ describe('buildVocabulary — 补全词库', () => {
 
   it('空条目集返回空词库', () => {
     expect(buildVocabulary([])).toEqual([]);
+  });
+});
+
+describe('buildHeadVocabulary — 首词补全词库', () => {
+  it('聚合各条目首词，按出现次数降序，同频按首见顺序', () => {
+    const vocab = buildHeadVocabulary(items);
+    expect(vocab.map((v) => v.word)).toEqual(['vue', '百度', '混元', '常用搜索']);
+  });
+
+  it('同首词跨条目累计词频，降序排列', () => {
+    const v = buildHeadVocabulary([
+      { keywordLine: 'a x', headKeyword: 'a', otherLines: [] },
+      { keywordLine: 'b y', headKeyword: 'b', otherLines: [] },
+      { keywordLine: 'a z', headKeyword: 'a', otherLines: [] },
+    ]);
+    expect(v).toEqual([
+      { word: 'a', count: 2 },
+      { word: 'b', count: 1 },
+    ]);
+  });
+
+  it('只取首词，关键词行其余词不参与', () => {
+    const v = buildHeadVocabulary([
+      { keywordLine: 'vue router 前端', headKeyword: 'vue', otherLines: [] },
+    ]);
+    expect(v).toEqual([{ word: 'vue', count: 1 }]);
+  });
+
+  it('空条目集返回空词库', () => {
+    expect(buildHeadVocabulary([])).toEqual([]);
   });
 });
 

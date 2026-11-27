@@ -1,5 +1,5 @@
 import './styles.css';
-import { buildQuery, buildVocabulary, type VocabEntry } from './lib/query';
+import { buildHeadVocabulary, buildQuery, buildVocabulary, type VocabEntry } from './lib/query';
 import { completions, editSearchText, FIELD_OPS, type FieldOp } from './lib/search-text';
 import { parseFile, splitUrlLine, type Item } from './lib/parse';
 import {
@@ -105,6 +105,7 @@ const usageTotalEl = app.querySelector<HTMLElement>('#usage-total')!;
 
 let items: Item[] = [];
 let vocab: VocabEntry[] = [];
+let headVocab: VocabEntry[] = [];
 
 type SortMode = 'file' | 'file-reverse' | 'random';
 let sortMode: SortMode = 'file';
@@ -293,10 +294,10 @@ function applyFieldOp(op: FieldOp): void {
 
 function updateSuggestions(): void {
   suggest.textContent = '';
-  const hits = completions(
-    search.value,
-    vocab.map((e) => e.word),
-  );
+  const hits = completions(search.value, {
+    keyword: vocab.map((e) => e.word),
+    head: headVocab.map((e) => e.word),
+  });
   if (hits.length === 0) {
     suggest.hidden = true;
     return;
@@ -360,6 +361,7 @@ function renderRecent(): void {
 function applyItems(source: Item[]): void {
   items = source;
   vocab = buildVocabulary(items);
+  headVocab = buildHeadVocabulary(items);
   countEl.textContent = `${items.length} 条目`;
   addressPool = buildAddressPool(items);
   // 开关行只在全部条目里至少有一条非地址条目的链接能拿到替代时出现

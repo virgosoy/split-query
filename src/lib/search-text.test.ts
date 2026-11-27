@@ -41,13 +41,19 @@ describe('editSearchText — toggleExclude', () => {
 });
 
 describe('editSearchText — complete', () => {
-  // 矩阵：[类别, 原文本, 补全词, 预期文本]
+  // 矩阵：[类别, 原文本, 补全词, 预期文本]。只替换值；`!` 与原前缀逐字保留。
   const matrix: Array<[string, string, string, string]> = [
     ['替换裸末词', 'vu', 'vue', 'vue'],
     ['多行只改末词', 'foo\nvu', 'vue', 'foo\nvue'],
-    ['取反词不补全', '!vu', 'vue', '!vu'],
-    ['字段前缀后不补全', 'k:vu', 'vue', 'k:vu'],
-    ['锚点前缀后不补全', 'k^:vu', 'vue', 'k^:vu'],
+    ['保留取反', '!vu', 'vue', '!vue'],
+    ['保留字段前缀', 'k:vu', 'vue', 'k:vue'],
+    ['保留锚点前缀', 'k^:vu', 'vue', 'k^:vue'],
+    ['保留取反与字段前缀', '!k:vu', 'vue', '!k:vue'],
+    ['全角冒号原样保留', 'k：vu', 'vue', 'k：vue'],
+    ['大写前缀与全角冒号原样保留', 'K^：VU', 'vue', 'K^：vue'],
+    ['空值前缀只补值', 'k:', 'vue', 'k:vue'],
+    ['空值取反只补值', '!', 'vue', '!vue'],
+    ['多 token 只改末词', 'k:百度 vu', 'vue', 'k:百度 vue'],
     ['空文本不变', '', 'vue', ''],
     ['空白末行不变', 'foo\n   ', 'vue', 'foo\n   '],
   ];
@@ -57,34 +63,51 @@ describe('editSearchText — complete', () => {
   });
 });
 
-describe('completions — 前缀候选', () => {
-  const words = ['vue', 'vite', 'Vuex', 'vues', 'router', 'v'];
+describe('completions — 按值匹配与词表分工', () => {
+  const vocab = {
+    keyword: ['vue', 'vite', 'Vuex', 'vues', 'router', 'v'],
+    head: ['vue', 'Vuex', 'vhead', '常用搜索'],
+  };
 
-  it('大小写不敏感前缀匹配，保持词库顺序，排除完全相等', () => {
-    expect(completions('v', words)).toEqual(['vue', 'vite', 'Vuex', 'vues']);
+  // 矩阵：[类别, 搜索文本, 预期候选]
+  const matrix: Array<[string, string, string[]]> = [
+    ['裸词用关键词行词库', 'v', ['vue', 'vite', 'Vuex', 'vues']],
+    ['k: 用关键词行词库', 'k:v', ['vue', 'vite', 'Vuex', 'vues']],
+    ['k^: 用关键词行词库', 'k^:v', ['vue', 'vite', 'Vuex', 'vues']],
+    ['大写前缀+全角冒号用关键词行词库', 'K^：v', ['vue', 'vite', 'Vuex', 'vues']],
+    ['取反不再屏蔽候选', '!v', ['vue', 'vite', 'Vuex', 'vues']],
+    ['取反+字段前缀不再屏蔽候选', '!k:v', ['vue', 'vite', 'Vuex', 'vues']],
+    ['h: 用首词词库', 'h:v', ['vue', 'Vuex', 'vhead']],
+    ['h^: 锚点前缀同样用首词词库', 'h^:v', ['vue', 'Vuex', 'vhead']],
+    ['取反+h: 用首词词库', '!h:v', ['vue', 'Vuex', 'vhead']],
+    ['h: 中文值匹配首词', 'h:常', ['常用搜索']],
+    ['多 token 只看末词', 'k:百度 vu', ['vue', 'Vuex', 'vues']],
+    ['多行只看末行末词', 'foo\nh:vu', ['vue', 'Vuex']],
+    ['值为空→关键词词表前 8', 'k:', ['vue', 'vite', 'Vuex', 'vues', 'router', 'v']],
+    ['锚点+空值→关键词词表前 8', 'k^:', ['vue', 'vite', 'Vuex', 'vues', 'router', 'v']],
+    ['h: 空值→首词词表前 8', 'h:', ['vue', 'Vuex', 'vhead', '常用搜索']],
+    ['裸 ! 空值→关键词词表前 8', '!', ['vue', 'vite', 'Vuex', 'vues', 'router', 'v']],
+  ];
+
+  it.each(matrix)('%s：%j', (_label, text, expected) => {
+    expect(completions(text, vocab)).toEqual(expected);
   });
 
-  it('输入大小写不敏感', () => {
-    expect(completions('VUE', words)).toEqual(['Vuex', 'vues']);
-  });
-
-  it('只看当前行末词', () => {
-    expect(completions('foo vu', words)).toEqual(['vue', 'Vuex', 'vues']);
+  it('输入大小写不敏感，排除与输入完全相等', () => {
+    expect(completions('VUE', vocab)).toEqual(['Vuex', 'vues']);
+    expect(completions('k:VUE', vocab)).toEqual(['Vuex', 'vues']);
   });
 
   it('上限 8', () => {
     const many = ['a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7', 'a8', 'a9', 'a10'];
-    expect(completions('a', many)).toEqual(many.slice(0, 8));
+    expect(completions('a', { keyword: many, head: [] })).toEqual(many.slice(0, 8));
   });
 
   it.each([
     ['空文本', ''],
     ['仅空白', '   '],
-    ['取反词', '!v'],
-    ['字段前缀', 'k:v'],
-    ['锚点前缀', 'k^:v'],
   ])('%s 返回空', (_label, text) => {
-    expect(completions(text, words)).toEqual([]);
+    expect(completions(text, vocab)).toEqual([]);
   });
 });
 

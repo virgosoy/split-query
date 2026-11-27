@@ -96,13 +96,21 @@ try {
   });
   check('导入 fixture 得到 3 条目', !!counted, true);
 
-  async function resultLines(query) {
+  /** 设置搜索文本并派发 input（触发过滤与候选），再在页面里求值 body。 */
+  async function withSearch(value, body) {
     return browser.evaluate(`(() => {
       const search = document.querySelector('#search');
-      search.value = ${JSON.stringify(query)};
+      search.value = ${JSON.stringify(value)};
       search.dispatchEvent(new Event('input', { bubbles: true }));
-      return [...document.querySelectorAll('#results .item-keyword')].map((e) => e.textContent);
+      ${body}
     })()`);
+  }
+
+  async function resultLines(query) {
+    return withSearch(
+      query,
+      `return [...document.querySelectorAll('#results .item-keyword')].map((e) => e.textContent);`,
+    );
   }
 
   check('k^:百', await resultLines('k^:百'), ['百度 谷歌 必应']);
@@ -122,6 +130,66 @@ try {
     `[...document.querySelectorAll('#results .item-keyword')].map((e) => e.textContent)`,
   );
   check('k^:百度 的结果', endToEnd, ['百度 谷歌 必应']);
+
+  // ---------- 自动补全（fixture 两份词库可区分） ----------
+  // 关键词行词库：百度 谷歌 必应 vue router 前端 常用搜索（各 1 次，首见顺序）
+  // 首词词库：百度 vue 常用搜索
+
+  async function suggestions(value) {
+    return withSearch(
+      value,
+      `const box = document.querySelector('#suggest');
+      return { hidden: box.hidden, chips: [...box.querySelectorAll('.chip')].map((c) => c.textContent) };`,
+    );
+  }
+
+  async function clickSuggestion(value, word) {
+    return withSearch(
+      value,
+      `const chip = [...document.querySelectorAll('#suggest .chip')].find((c) => c.textContent === ${JSON.stringify(word)});
+      if (!chip) return null;
+      chip.click();
+      return { value: search.value, hidden: document.querySelector('#suggest').hidden };`,
+    );
+  }
+
+  check('空文本无候选', await suggestions(''), { hidden: true, chips: [] });
+  check('裸词用关键词行词库', await suggestions('v'), { hidden: false, chips: ['vue'] });
+  check('k: 值为空给关键词词表前 8', await suggestions('k:'), {
+    hidden: false,
+    chips: ['百度', '谷歌', '必应', 'vue', 'router', '前端', '常用搜索'],
+  });
+  check('h: 值为空只给首词词表', await suggestions('h:'), {
+    hidden: false,
+    chips: ['百度', 'vue', '常用搜索'],
+  });
+  check('h: 不出现非首词候选', await suggestions('h:前'), { hidden: true, chips: [] });
+  check('裸词仍出现非首词候选', await suggestions('前'), { hidden: false, chips: ['前端'] });
+  check('取反不屏蔽候选', await suggestions('!v'), { hidden: false, chips: ['vue'] });
+  check('k^: 前缀不屏蔽候选', await suggestions('k^:v'), { hidden: false, chips: ['vue'] });
+  check('!k: 前缀不屏蔽候选', await suggestions('!k:'), {
+    hidden: false,
+    chips: ['百度', '谷歌', '必应', 'vue', 'router', '前端', '常用搜索'],
+  });
+  check('大写前缀+全角冒号不屏蔽候选', await suggestions('K^：v'), { hidden: false, chips: ['vue'] });
+  check('h: 用首词词库', await suggestions('h:v'), { hidden: false, chips: ['vue'] });
+  check('多行只补末行末词', await suggestions('foo\nk:vu'), { hidden: false, chips: ['vue'] });
+
+  check('点选裸词只替换值', await clickSuggestion('v', 'vue'), { value: 'vue', hidden: true });
+  check('点选保留锚点前缀', await clickSuggestion('k^:vu', 'vue'), { value: 'k^:vue', hidden: true });
+  check('点选取反保留 !', await clickSuggestion('!vu', 'vue'), { value: '!vue', hidden: true });
+  check('点选取反+前缀逐字保留', await clickSuggestion('!k:vu', 'vue'), { value: '!k:vue', hidden: true });
+  check('点选大写+全角前缀逐字保留', await clickSuggestion('K^：v', 'vue'), { value: 'K^：vue', hidden: true });
+  check('点选 h: 空值补值', await clickSuggestion('h:', 'vue'), { value: 'h:vue', hidden: true });
+  check('点选 k: 空值补值', await clickSuggestion('k:', '前端'), { value: 'k:前端', hidden: true });
+  check('点选多行只改末行', await clickSuggestion('foo\nk:vu', 'vue'), {
+    value: 'foo\nk:vue',
+    hidden: true,
+  });
+  check('点选多 token 只改末词', await clickSuggestion('k:百度 v', 'vue'), {
+    value: 'k:百度 vue',
+    hidden: true,
+  });
 
   const layout = await browser.evaluate(`(() => {
     const bar = document.querySelector('#toolbar');
