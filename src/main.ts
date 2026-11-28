@@ -141,9 +141,71 @@ let addressAlternativesOn = loadAddressPref();
 
 // ---------- 渲染 ----------
 
-function render(list: Item[]): void {
+/** 结果区每次最多渲染的条目数；其余由「加载更多」按页追加。 */
+const PAGE_SIZE = 200;
+
+/** 当前命中集合（已按排序方式排好）；「加载更多」只追加，不重新过滤。 */
+let matches: Item[] = [];
+/** 已渲染到结果区的条数。 */
+let shown = 0;
+
+/** 建一条卡片的 DOM。 */
+function createCard(item: Item): HTMLElement {
+  const card = document.createElement('article');
+  card.className = 'item';
+
+  const keyword = document.createElement('div');
+  keyword.className = 'item-keyword';
+  keyword.textContent = item.keywordLine;
+  card.appendChild(keyword);
+
+  for (const line of item.otherLines) {
+    const urlLine = splitUrlLine(line);
+    if (urlLine !== null) {
+      const row = document.createElement('div');
+      row.className = 'link-row';
+
+      const link = document.createElement('a');
+      link.className = 'item-link';
+      link.href = urlLine.url;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.textContent = urlLine.url;
+      row.appendChild(link);
+
+      if (urlLine.note !== '') {
+        const note = document.createElement('span');
+        note.className = 'link-note';
+        note.textContent = urlLine.note;
+        row.appendChild(note);
+      }
+
+      card.appendChild(row);
+      if (addressAlternativesOn && !isAddressItem(item)) {
+        const alternatives = alternativesFor(urlLine.url, addressPool);
+        if (alternatives.length > 0) card.appendChild(renderAlternatives(alternatives));
+      }
+    } else {
+      const p = document.createElement('p');
+      p.className = 'item-note';
+      p.textContent = line;
+      card.appendChild(p);
+    }
+  }
+  return card;
+}
+
+/** 建一批卡片并插入结果区；`before` 用于插在「加载更多」行之前。 */
+function appendCards(list: readonly Item[], before: Node | null = null): void {
+  const fragment = document.createDocumentFragment();
+  for (const item of list) fragment.appendChild(createCard(item));
+  results.insertBefore(fragment, before);
+}
+
+/** 渲染当前命中集合的前 `shown` 条，必要时附上「加载更多」行。 */
+function renderResults(): void {
   results.textContent = '';
-  if (list.length === 0) {
+  if (matches.length === 0) {
     const empty = document.createElement('p');
     empty.className = 'empty';
     empty.textContent =
@@ -153,50 +215,40 @@ function render(list: Item[]): void {
     results.appendChild(empty);
     return;
   }
-  for (const item of list) {
-    const card = document.createElement('article');
-    card.className = 'item';
+  appendCards(matches.slice(0, shown));
+  if (matches.length > shown) appendMoreRow();
+}
 
-    const keyword = document.createElement('div');
-    keyword.className = 'item-keyword';
-    keyword.textContent = item.keywordLine;
-    card.appendChild(keyword);
+/**
+ * 「加载更多」行：显示命中总数与已显示数，按页追加且不重建已有卡片。
+ * 全部显示后只隐藏按钮、保留计数，避免焦点丢失。
+ */
+function appendMoreRow(): void {
+  const row = document.createElement('div');
+  row.className = 'results-more';
 
-    for (const line of item.otherLines) {
-      const urlLine = splitUrlLine(line);
-      if (urlLine !== null) {
-        const row = document.createElement('div');
-        row.className = 'link-row';
+  const status = document.createElement('span');
+  status.className = 'results-more-status';
+  row.appendChild(status);
 
-        const link = document.createElement('a');
-        link.className = 'item-link';
-        link.href = urlLine.url;
-        link.target = '_blank';
-        link.rel = 'noopener noreferrer';
-        link.textContent = urlLine.url;
-        row.appendChild(link);
+  const button = document.createElement('button');
+  button.className = 'chip';
+  button.type = 'button';
+  button.textContent = '加载更多';
+  button.addEventListener('click', () => {
+    const before = shown;
+    shown = Math.min(shown + PAGE_SIZE, matches.length);
+    appendCards(matches.slice(before, shown), row);
+    status.textContent =
+      shown >= matches.length
+        ? `共 ${matches.length} 条，已全部显示`
+        : `共 ${matches.length} 条，已显示 ${shown} 条`;
+    button.hidden = shown >= matches.length;
+  });
+  row.appendChild(button);
 
-        if (urlLine.note !== '') {
-          const note = document.createElement('span');
-          note.className = 'link-note';
-          note.textContent = urlLine.note;
-          row.appendChild(note);
-        }
-
-        card.appendChild(row);
-        if (addressAlternativesOn && !isAddressItem(item)) {
-          const alternatives = alternativesFor(urlLine.url, addressPool);
-          if (alternatives.length > 0) card.appendChild(renderAlternatives(alternatives));
-        }
-      } else {
-        const p = document.createElement('p');
-        p.className = 'item-note';
-        p.textContent = line;
-        card.appendChild(p);
-      }
-    }
-    results.appendChild(card);
-  }
+  status.textContent = `共 ${matches.length} 条，已显示 ${shown} 条`;
+  results.appendChild(row);
 }
 
 /**
@@ -247,7 +299,9 @@ function createAltChip(alt: AlternativeLink): HTMLAnchorElement {
 function renderFiltered(): void {
   const base =
     sortMode === 'random' ? randomOrder : sortMode === 'file-reverse' ? reverse(items) : items;
-  render(base.filter(buildQuery(search.value)));
+  matches = base.filter(buildQuery(search.value));
+  shown = Math.min(PAGE_SIZE, matches.length);
+  renderResults();
   syncSortbar();
   syncAddressBar();
   updateSuggestions();
